@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import sys
+from Hardware import *
 import MouseInteraction as mouse
 from Colour import Colour
 import OpenCVHelpers as cvh
@@ -11,28 +12,19 @@ from VideoStream import VideoStream
 from Ball import Ball
 from BallTracker import BallTracker
 from OctaveGrid import OctaveGrid
-#from psonic import *
+# from psonic import *
 import math
-#import pygame
-#import pygame.mixer
+# import pygame
+# import pygame.mixer
 from soundsocketserver import SoundSocketServer
 from simplewebserver import *
 from web import *
 
-guitar = None
 
 def setup_pygame_mixer():
-    global guitar
-#    pygame.mixer.pre_init(buffer=2096)
- #   pygame.mixer.init() 
-    
-  #  sound = pygame.mixer.Sound("guitarc4.wav")
-   
-    
-   # guitar = sound
-    
-    
-    
+    pass
+
+
 def nothing(x):
     x = 0
     pass
@@ -52,18 +44,18 @@ def morph_kernel():
     global the_kernel
     if the_kernel is None:
         the_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        
+
         # RPI cannot handle large kernels....
-        the_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,  (3, 3))
+        the_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     return the_kernel
 
 
 def track_colour(input_frame_hsv, lower_range, higher_range):
     mask = cv2.inRange(input_frame_hsv, lower_range, higher_range)
 
-   # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel(), iterations=1)
-  #  mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel(), iterations=2)
-    
+    # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel(), iterations=1)
+    #  mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel(), iterations=2)
+
     # http://docs.opencv.org/trunk/d9/d8b/tutorial_py_contours_hierarchy.html
     # we use external so any small 'gaps' are ignored, e.g. a highlight for example within a sphere..
     image, contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -113,22 +105,18 @@ def find_coloured_balls(frame, colours):
 
     min_enclosing = get_ui('min_enclosing')
     max_enclosing = get_ui('max_enclosing')
-    
+
     show_masks = get_ui('show_masks')
     min_area = get_ui('min_area')
 
     new_balls = []
-    
-    
 
     for colour in colours:
         mask, contours = track_colour(hsv, colour.low_as_numpy, colour.high_as_numpy)
         colour.mask = mask
         colour.contours = contours
         if show_masks > 50:
-            cv2.imshow('mask_'+colour.name, mask)
-        
-        
+            cv2.imshow('mask_' + colour.name, mask)
 
         for contour in colour.contours:
 
@@ -141,32 +129,32 @@ def find_coloured_balls(frame, colours):
                 col = (255, 255, 0)  # is valid
             else:
                 is_valid = False
-                
-            area = 0    
+
+            area = 0
             if is_valid:
                 area = cv2.contourArea(contour)
                 if area < (min_area * min_area):
-                    is_valid = False 
+                    is_valid = False
 
             if is_valid:
                 # do some other stuff to validate...
 
                 cv2.drawContours(frame, [contour], DRAW_ALL, colour.rgb)
-                
+
                 center = (int(x), int(y))
 
                 cv2.circle(frame, center, int(radius), col, thickness=1)
                 # cv2.circle(frame, (int(x), int(y)), 4, (255, 255, 0), thickness=cv2.FILLED)
 
-                #moments = cv2.moments(contour)
+                # moments = cv2.moments(contour)
 
-                #m00 = moments["m00"]
-                #if m00 != 0:
-                 #   center = (int(moments["m10"] / m00), int(moments["m01"] / m00))
-                
-              #  cv2.circle(img=frame, center=center, radius=3, color=(0, 0, 255), thickness=cv2.FILLED)
+                # m00 = moments["m00"]
+                # if m00 != 0:
+                #   center = (int(moments["m10"] / m00), int(moments["m01"] / m00))
 
-                
+                #  cv2.circle(img=frame, center=center, radius=3, color=(0, 0, 255), thickness=cv2.FILLED)
+
+
 
                 new_balls.append((colour, radius, (x, y), area))
 
@@ -198,11 +186,9 @@ def find_coloured_balls(frame, colours):
     # cv2.rectangle(grey, (0, 0), (20, 20), (255, 255, 255), 5)
 
     #    cv2.imshow('frame',grey)
-    
-    
-    
-class Prop:
 
+
+class Prop:
     def __init__(self, name, min_val, max_val, cur_val, group='ui'):
         self.name = name
         self.min_value = min_val
@@ -210,9 +196,6 @@ class Prop:
         self.cur_value = curl_val
         self.range_value = self.max_value - self.min_value
         self.group = group
-    
-  
-        
 
 
 def prep_ui(name='ui'):
@@ -226,30 +209,32 @@ def prep_ui(name='ui'):
     cv2.setTrackbarPos('show_masks', name, 50)
     cv2.createTrackbar('min_area', name, 0, 400, nothing)
     cv2.setTrackbarPos('min_area', name, 6)
-    
-  #  cv2.createTrackbar('iso', name, 0, 800, nothing)
-  #  cv2.setTrackbarPos('iso', name, 200)
-  #  cv2.createTrackbar('shutter_speed', name, 0, 800000, nothing)
-  #  cv2.setTrackbarPos('shutter_speed', name, 160000)
-  #  cv2.createTrackbar('brightness', name, 0, 100, nothing)
-  #  cv2.setTrackbarPos('brightness', name, 50)
-  #  cv2.createTrackbar('contrast', name, 0, 200, nothing)
-  #  cv2.setTrackbarPos('contrast', name, 100)
-  #  cv2.createTrackbar('sharpness', name, 0, 200, nothing)
-  #  cv2.setTrackbarPos('sharpness', name, 100)
+
+    #  cv2.createTrackbar('iso', name, 0, 800, nothing)
+    #  cv2.setTrackbarPos('iso', name, 200)
+    #  cv2.createTrackbar('shutter_speed', name, 0, 800000, nothing)
+    #  cv2.setTrackbarPos('shutter_speed', name, 160000)
+    #  cv2.createTrackbar('brightness', name, 0, 100, nothing)
+    #  cv2.setTrackbarPos('brightness', name, 50)
+    #  cv2.createTrackbar('contrast', name, 0, 200, nothing)
+    #  cv2.setTrackbarPos('contrast', name, 100)
+    #  cv2.createTrackbar('sharpness', name, 0, 200, nothing)
+    #  cv2.setTrackbarPos('sharpness', name, 100)
     cv2.createTrackbar('saturation', name, 0, 200, nothing)
     cv2.setTrackbarPos('saturation', name, 100)
+
 
 def get_ui(name, window_name='ui'):
     return cv2.getTrackbarPos(name, window_name)
 
-server =None
+
+server = None
 
 
 def process_frame(colours, frame, ball_tracker, original, grid):
     global server
-    #global guitar
-# get UI values before frame update
+    # global guitar
+    # get UI values before frame update
     for colour in colours:
         low, high = get_colour_ui_values(colour.name)
         colour.update(low, high)
@@ -286,23 +271,21 @@ def process_frame(colours, frame, ball_tracker, original, grid):
 
     grid_messages = []
 
-
     grid.draw(frame)
-    
-    
+
     for ball in ball_tracker.balls:
         x = int(ball.pos[0])
         y = int(ball.pos[1])
-        cvh.draw_text(frame, str(ball.id), (x,y ))
-        
+        cvh.draw_text(frame, str(ball.id), (x, y))
+
         division = grid.pos_to_division(x, y)
-   
+
         dx, dy, ok = division
-        
+
         location = (dx, dy)
-       
+
         should_play = False
-        
+
         if ok:
             if (ball.division is None):
                 should_play = True
@@ -310,74 +293,87 @@ def process_frame(colours, frame, ball_tracker, original, grid):
                 should_play = True
             ball.division = location
 
-            
-            
             if should_play:
                 grid_messages.append((ball.colour.name, ball.area_of_circle(), dx, dy))
-                #note = 0 + (dx * 1) + (dy * 12)
-            #size = ((ball.area_of_circle() / (frame.shape[0]*frame.shape[1]) * 100.0))
-            #for client in server.clients:
-            #    client.sendMessage(ball.colour.name+','+str(note)+','+str(size)) 
-        
-        
-        
+                # note = 0 + (dx * 1) + (dy * 12)
+                # size = ((ball.area_of_circle() / (frame.shape[0]*frame.shape[1]) * 100.0))
+                # for client in server.clients:
+                #    client.sendMessage(ball.colour.name+','+str(note)+','+str(size))
+
         grid.draw_division_cell(frame, dx, dy, ok)
-        
 
     return frame, grid_messages
+
+
+IS_RASPBERRY_PI = is_raspberry_pi()
 
 state = 'none'
 stabilizing_counter = 0
 
+
 def start_state(new_state):
     global state
-    print ("change state from "+state+" -> "+new_state)
+    print("change state from " + state + " -> " + new_state)
     state = new_state
 
 
 def start_stabilize(vs):
     global stabilizing_counter
+    global IS_RASPBERRY_PI
     start_state('stabilize')
     stabilizing_counter = 0
-    vs.stream.camera.exposure_mode = 'auto'
-    vs.stream.camera.awb_mode = "auto" #PiCamera.AWB_MODES, aslo awb_gain
-    
-    
+    if IS_RASPBERRY_PI:
+        vs.stream.camera.exposure_mode = 'auto'
+        vs.stream.camera.awb_mode = "auto"  # PiCamera.AWB_MODES, aslo awb_gain
+
+
 def end_stabilize(vs):
-    gains = vs.stream.camera.awb_gains
-    vs.stream.camera.awb_mode = "off"
-    vs.stream.camera.awb_gains = gains
-    vs.stream.camera.exposure_mode = 'off'
+    global IS_RASPBERRY_PI
+    if IS_RASPBERRY_PI:
+        gains = vs.stream.camera.awb_gains
+        vs.stream.camera.awb_mode = "off"
+        vs.stream.camera.awb_gains = gains
+        vs.stream.camera.exposure_mode = 'off'
 
 
 def do(colours):
     global stabilizing_counter
     global state
     global server
+    global IS_RASPBERRY_PI
+
     try:
-        #//full 
-        #//2592 x 1944
-        #//1296 x 972
-        #//1296 x 730
-        #//
-        mult = 100 #120 is fine for 30fps, 2 colours
-        vs = VideoStream(usePiCamera=1, resolution=(4 * mult,3 * mult +4 ), framerate=30)
-        
-        vs.stream.camera.hflip = True
+        # //full
+        # //2592 x 1944
+        # //1296 x 972
+        # //1296 x 730
+        # //
+        if IS_RASPBERRY_PI:
+            mult = 100  # 120 is fine for 30fps, 2 colours
+            resolution = (4 * mult, 3 * mult + 4)
+            framerate = 30
+        else:
+            resolution = (640, 480)
+            framerate = 60
+
+        vs = VideoStream(usePiCamera=IS_RASPBERRY_PI, resolution=resolution, framerate=framerate)
+
+        if IS_RASPBERRY_PI:
+            vs.stream.camera.hflip = True
+
         vs.start()
-        
-        
-        
+
         time.sleep(2.0)
-        
-        res_x, res_y = vs.stream.camera.resolution
+        if IS_RASPBERRY_PI:
+            # rpi tends to change the res...
+            res_x, res_y = vs.stream.camera.resolution
+        else:
+            res_x, res_y = resolution
 
-        grid = OctaveGrid(res_x,res_y,padding=10,divisions_x=10, divisions_y=2)
+        grid = OctaveGrid(res_x, res_y, padding=10, divisions_x=10, divisions_y=2)
 
-
-        #pprint(vs)
+        # pprint(vs)
         cv2.namedWindow('frame')  # for mouse events
-       
 
         mouse.connect('frame')
 
@@ -385,83 +381,48 @@ def do(colours):
 
         fps = FramesPerSecond()
         ips = FramesPerSecond()
-        original = None
+        # original = None
 
         ball_tracker = BallTracker(res_x)
 
         showvideo = True
         last_frame_count = -1
-        
- #       run("""
-#use_bpm 120
-#use_synth_defaults release: 1.0, amp: 1.5, cutoff: 90
-#use_synth :tri
 
-#live_loop :blue do
-#  use_real_time
-#  use_synth :tri
-#  
-#  n, s = sync "/osc/osc/blue"
-#  play n, amp: s
-#end
-
-
-#live_loop :pink do
-#  use_real_time
-#  use_synth :piano
-#  
-#  n, s = sync "/osc/osc/pink"
-#  play n, decay_level:2
-#end
-#""")
-        
-          
-        note = 70
-        
-        server = SoundSocketServer('', 8001)
-        
         web_server = startWebServerInSeperateProcess(8000)
-        
+        server = SoundSocketServer('', 8001)
+
+        #if IS_RASPBERRY_PI:
         startBrowserInSeperateProcess("http://localhost:8000/socket.html")
-        
-        #setup_pygame_mixer()
-        
+
         start_stabilize(vs)
-        
+
         running = True
+        frame = None
 
         while running:
-            
-            # Capture frame-by-frame
-        #~captured_and_ready, frame = cap.read()
-         #   pprint(frame)
-          #  if not captured_and_ready:
-           #     continue
-            # the frame is a BGR image (open_cv default).
 
-            frame_count, frame = vs.read_with_count()
-            
-            pixel_count = (frame.shape[0]*frame.shape[1])
-            
+            frame_count, new_frame = vs.read_with_count()
+
+            pixel_count = (new_frame.shape[0] * new_frame.shape[1])
+
             if frame_count != last_frame_count:
+                frame = new_frame
                 ips.add()
                 last_frame_count = frame_count
                 original = cvh.clone_image(frame)
-                
+
                 if state == 'stabilize':
                     stabilizing_counter = stabilizing_counter + 1
-                    cvh.draw_text(frame, str(stabilizing_counter ) + 
-                    ' stabilising', (5, 40), (255, 255, 255))
+                    cvh.draw_text(frame, str(stabilizing_counter) +
+                                  ' stabilising', (5, 40), (255, 255, 255))
                     if stabilizing_counter > 50:
                         end_stabilize(vs)
                         start_state('normal')
-                        
+
                 if state == 'normal':
-                    
-                    
-                    
+
                     frame, grid_messages = process_frame(colours, frame, ball_tracker, original, grid)
-                    
+
                     m = mouse.mouse()
                     # mouse overlay
                     if m.mode == mouse.MouseInteraction.DRAWING:
@@ -470,56 +431,57 @@ def do(colours):
                         (mean, stddev) = cvh.mean_and_stddev_of_circle(original, m.draw_pos, m.draw_size)
                         hsv = cvh.bgr_to_hsv(mean[0], mean[1], mean[2])
                         cvh.draw_text(frame, str(hsv) + ' ' + str(stddev), m.draw_last_pos)
-                        
-                    if(len(grid_messages) > 0):
+
+                    if (len(grid_messages) > 0):
                         sound_messages = []
                         for message in grid_messages:
                             colour, ball_size, dx, dy = message
                             note = 0 + (dx * 1) + (dy * 12)
                             percent_of_screen = ((ball_size / pixel_count) * 100.0)
-                            sound_messages.append(colour+','+str(note)+','+str(percent_of_screen)) 
-                        sound_message = ";".join(sound_messages)    
-                                        
-                        server.send_to_all(sound_message)                   
-                        #for client in server.clients:
-                        #    client.sendMessage(sound_message) 
-        
-                        
-            
+                            sound_messages.append(colour + ',' + str(note) + ',' + str(percent_of_screen))
+                        sound_message = ";".join(sound_messages)
 
-  # show fps
+                        if IS_RASPBERRY_PI:
+                            server.send_to_all(sound_message)
+                            # for client in server.clients:
+                            #    client.sendMessage(sound_message)
+            else:
+                # print("Same Frame: " + str(frame_count) + ' = ' + str(last_frame_count))
+                pass
+
+
+
+
+                # show fps
             fps.add()
-            cvh.draw_text(frame, 
-                str(fps.fps) + 'fps ' +
-                str(ips.fps) + 'pips' + 
-                str(vs.fps()) + 'cips', (5, 20), (255, 255, 255))
-                
-            #grid.draw(frame)    
-                
+            cvh.draw_text(frame,
+                          str(fps.fps) + 'fps ' +
+                          str(ips.fps) + 'pips' +
+                          str(vs.fps()) + 'cips', (5, 20), (255, 255, 255))
 
             if showvideo:
                 cv2.imshow('frame', frame)
 
 
-            server.serveonce() #this is slow....
-           #print (str(len(server.clients)))
+            server.serveonce()  # this is slow....
 
             key = cv2.waitKey(1) & 0xFF
 
-            if  key == ord('q'):
+            if key == ord('q'):
                 break
             if key == ord('t'):
                 showvideo = not showvideo
-                
+
             if key == ord('s'):
                 start_stabilize(vs)
-                
+
             if key == ord("f"):
-                vs.stream.camera.hflip = not vs.stream.camera.hflip
-    
+                if IS_RASPBERRY_PI:
+                    vs.stream.camera.hflip = not vs.stream.camera.hflip
+
     except KeyboardInterrupt:
         print("CRTL+C")
-        running = False           
+
 
     except:
         print("Unexpected error:", sys.exc_info()[0])
@@ -527,27 +489,27 @@ def do(colours):
 
     # When everything done, release the capture
     vs.stop()
-   # pygame.mixer.quit()
+
     stopWebServerInSeperateProcess(web_server)
-
-colours = [
-    Colour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),
-    Colour(name="green", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 0]),
-    Colour(name="yellow", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 255]),
-    Colour(name="pink", low=[0, 0, 0], high=[255, 255, 255], rgb=[255, 0, 255]),
- #   Colour(name="ornage", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 165, 255])
-]
-
-load_colours(colours=colours)
+    # pygame.mixer.quit()
+    #if IS_RASPBERRY_PI:
 
 
+# https://stackoverflow.com/questions/18204782/runtimeerror-on-windows-trying-python-multiprocessing
+if __name__ == '__main__':
 
+    colours = [
+        Colour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),
+        Colour(name="green", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 0]),
+        Colour(name="yellow", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 255]),
+        Colour(name="pink", low=[0, 0, 0], high=[255, 255, 255], rgb=[255, 0, 255]),
+        #   Colour(name="ornage", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 165, 255])
+    ]
 
+    load_colours(colours=colours)
 
+    do(colours=colours)
 
-
-do(colours=colours)
-
-cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 # https://www.pyimagesearch.com/2017/02/06/faster-video-file-fps-with-cv2-videocapture-and-opencv/
 #  - optimize and rpi compatible...

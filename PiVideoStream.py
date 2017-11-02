@@ -1,4 +1,5 @@
 # import the necessary packages
+# these will only be loaded on RPI...
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from threading import Thread
