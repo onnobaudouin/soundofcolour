@@ -1,6 +1,7 @@
 from JSON import JSON
 import numpy as np
 
+
 class Colour:
     def __init__(self, name, low=[0, 0, 0], high=[255, 255, 255], rgb=[255, 255, 255]):
         self.name = name
