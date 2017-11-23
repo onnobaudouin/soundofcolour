@@ -194,8 +194,8 @@ class Property:
 
 class Properties:
     def __init__(self, name=None):
-        self.props = collections.OrderedDict
-        self.groups = collections.OrderedDict
+        self.props = collections.OrderedDict()
+        self.groups = collections.OrderedDict()
         self.name = name
 
     def group(self, name):
@@ -209,7 +209,7 @@ class Properties:
         self.props[name] = p
 
     def as_dict(self):
-        d = collections.OrderedDict
+        d = collections.OrderedDict()
         for key, p in self.props.items():
             d[p.name] = p.as_dict()[p.name]
         for key, g in self.groups.items():
