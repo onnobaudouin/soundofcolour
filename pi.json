@@ -1,0 +1,71 @@
+{
+  "colours": {
+    "blue": {
+      "max_hsv": [
+        140,
+        251,
+        189
+      ],
+      "min_hsv": [
+        94,
+        109,
+        77
+      ]
+    },
+    "green": {
+      "max_hsv": [
+        97,
+        255,
+        223
+      ],
+      "min_hsv": [
+        42,
+        32,
+        35
+      ]
+    },
+    "yellow": {
+      "max_hsv": [
+        32,
+        189,
+        167
+      ],
+      "min_hsv": [
+        16,
+        74,
+        110
+      ]
+    },
+    "pink": {
+      "max_hsv": [
+        175,
+        255,
+        164
+      ],
+      "min_hsv": [
+        149,
+        86,
+        77
+      ]
+    },
+    "orange": {
+      "max_hsv": [
+        180,
+        255,
+        238
+      ],
+      "min_hsv": [
+        180,
+        134,
+        63
+      ]
+    }
+  },
+  "ui": {
+    "blur": 0,
+    "show_masks": false,
+    "max_circle": 200,
+    "min_circle": 5,
+    "min_area": 5
+  }
+}
