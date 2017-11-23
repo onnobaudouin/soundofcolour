@@ -1,5 +1,6 @@
-from Ball import Ball 
+from Ball import Ball
 import sys
+
 
 class BallTracker:
     def __init__(self, width):
@@ -28,26 +29,18 @@ class BallTracker:
                 ball.dead_frames = ball.dead_frames + 1
                 ball.alive_frames = 0
 
-        #pprint(self.balls)
-        #for b in self.balls:
-            #print(str(b.id) + ' '+str(b.alive_frames))
-
+                # pprint(self.balls)
+                # for b in self.balls:
+                # print(str(b.id) + ' '+str(b.alive_frames))
 
         # weed out dead balls -
         self.balls = [i for i in self.balls if i.dead_frames < 5]
-        
-        
-        
+
         ret = [i for i in self.balls if i.alive_frames > 1]
 
-        #print (str(len(self.balls))+' '+str(len(ret)))
+        # print (str(len(self.balls))+' '+str(len(ret)))
 
         return ret
-
-
-
-
-
 
     def best_matching(self, new_ball):
         if len(self.balls) == 0:
@@ -61,7 +54,8 @@ class BallTracker:
                 return ball
         return None
 
-    def comparison_with_lowest_distance(self, comparisons):
+    @staticmethod
+    def comparison_with_lowest_distance(comparisons):
         min_distance = sys.maxsize
         min_object = None
         for c in comparisons:
@@ -73,7 +67,7 @@ class BallTracker:
 
     def compare(self, ball, new_ball):
         if ball.matched:
-            return None 
+            return None
         colour, radius, pos, area = new_ball
         if ball.colour != colour:
             return None

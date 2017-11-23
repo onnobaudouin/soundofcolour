@@ -17,9 +17,7 @@ class WebcamVideoStream:
 
         self.stream.set(cv2.CAP_PROP_FPS, framerate)  # doesn't work on webcam
 
-        #(self.grabbed, self.frame) = self.stream.read()
-
-
+        # (self.grabbed, self.frame) = self.stream.read()
         # initialize the variable used to indicate if the thread should
         # be stopped
         self.stopped = False
@@ -50,8 +48,6 @@ class WebcamVideoStream:
             self.frame_count = self.frame_count + 1
             self.frame = frame
             self.fps.add()
-
-
 
     def read(self):
         # return the frame most recently read

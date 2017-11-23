@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+
 # mouse = []
 # 'EVENT_FLAG_ALTKEY',
 # 'EVENT_FLAG_CTRLKEY',

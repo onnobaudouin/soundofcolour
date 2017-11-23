@@ -4,7 +4,7 @@ from webcamvideostream import WebcamVideoStream
 
 class VideoStream:
     def __init__(self, src=0, usePiCamera=False, resolution=(320, 240),
-        framerate=32):
+                 framerate=32):
 
         print("loading videostream")
         # check to see if the picamera module should be used
@@ -18,13 +18,13 @@ class VideoStream:
             # initialize the picamera stream and allow the camera
             # sensor to warmup
             self.stream = PiVideoStream(resolution=resolution,
-                framerate=framerate)
+                                        framerate=framerate)
 
         # otherwise, we are using OpenCV so initialize the webcam
         # stream
         else:
             self.stream = WebcamVideoStream(src=src, resolution=resolution,
-                framerate=framerate)
+                                            framerate=framerate)
 
     def start(self):
         # start the threaded video stream
@@ -44,7 +44,6 @@ class VideoStream:
 
     def read_with_count(self):
         return self.stream.frame_count, self.stream.read()
-        
+
     def fps(self):
         return self.stream.fps.fps
-

@@ -1,4 +1,6 @@
 import math
+
+
 class Ball:
     next_id = 0
 
@@ -15,13 +17,14 @@ class Ball:
         self.dead_frames = 0
         self.alive_frames = 0
         self.matched = False
-        
+
         self.division = None
 
-    def get_new_id(self):
-        id = Ball.next_id
+    @staticmethod
+    def get_new_id():
+        new_id = Ball.next_id
         Ball.next_id = Ball.next_id + 1
-        return id
+        return new_id
 
     def update(self, ball_tuple):
         colour, radius, pos, area = ball_tuple
@@ -30,6 +33,6 @@ class Ball:
         self.pos = pos
         self.radius = radius
         self.area = area
-        
+
     def area_of_circle(self):
         return self.radius * self.radius * math.pi

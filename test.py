@@ -7,18 +7,13 @@ from Colour import Colour
 import OpenCVHelpers as cvh
 from FramesPerSecond import FramesPerSecond
 import time
-from pprint import pprint
 from VideoStream import VideoStream
-from Ball import Ball
 from BallTracker import BallTracker
 from OctaveGrid import OctaveGrid
-# from psonic import *
-import math
-# import pygame
-# import pygame.mixer
 from soundsocketserver import SoundSocketServer
 from simplewebserver import *
 from web import *
+from propertiesopencvui import *
 
 
 def setup_pygame_mixer():
@@ -26,7 +21,6 @@ def setup_pygame_mixer():
 
 
 def nothing(x):
-    x = 0
     pass
 
 
@@ -187,15 +181,14 @@ def find_coloured_balls(frame, colours):
 
     #    cv2.imshow('frame',grey)
 
-
-class Prop:
-    def __init__(self, name, min_val, max_val, cur_val, group='ui'):
-        self.name = name
-        self.min_value = min_val
-        self.max_value = max_val
-        self.cur_value = curl_val
-        self.range_value = self.max_value - self.min_value
-        self.group = group
+    # class Prop:
+    #     def __init__(self, name, min_val, max_val, cur_val, group='ui'):
+    #         self.name = name
+    #         self.min_value = min_val
+    #         self.max_value = max_val
+    #         self.cur_value = cur_val
+    #         self.range_value = self.max_value - self.min_value
+    #         self.group = group
 
 
 def prep_ui(name='ui'):
@@ -342,6 +335,28 @@ def do(colours):
     global server
     global IS_RASPBERRY_PI
 
+    props = Properties()
+    ui = props.group("ui")
+    ui.add("blur", PropType.unsigned_int, maximum=250)
+    ui.add("min_circle", PropType.unsigned_int, maximum=250)
+    ui.add("max_circle", PropType.unsigned_int, maximum=250)
+    ui.add("show_masks", PropType.bool)
+    ui.add("min_area", PropType.unsigned_int)
+    colours2 = props.group("colours")
+    col = ["blue", "green", "yellow", "orange", "pink"]
+    for name in col:
+        colour = colours2.group(name)
+        colour.add('min_hsv', PropType.hsv)
+        colour.add('max_hsv', PropType.hsv)
+    # pprint(props.as_dict())
+    props.load('pi.json')
+
+    prop_ui = PropertiesOpenCVUI(props)
+    prop_ui.show('colours/blue')
+
+    # pprint(props.as_dict())
+    # props.save('pi.json')
+
     try:
         # //full
         # //2592 x 1944
@@ -353,7 +368,7 @@ def do(colours):
             resolution = (4 * mult, 3 * mult + 4)
             framerate = 30
         else:
-            resolution = (640, 480)
+            resolution = (int(1280 / 2) , int(720 / 2))
             framerate = 60
 
         vs = VideoStream(usePiCamera=IS_RASPBERRY_PI, resolution=resolution, framerate=framerate)
@@ -391,7 +406,7 @@ def do(colours):
         web_server = startWebServerInSeperateProcess(8000)
         server = SoundSocketServer('', 8001)
 
-        #if IS_RASPBERRY_PI:
+        # if IS_RASPBERRY_PI:
         startBrowserInSeperateProcess("http://localhost:8000/socket.html")
 
         start_stabilize(vs)
@@ -403,9 +418,10 @@ def do(colours):
 
             frame_count, new_frame = vs.read_with_count()
 
-            pixel_count = (new_frame.shape[0] * new_frame.shape[1])
+            if frame_count != last_frame_count and new_frame is not None:
 
-            if frame_count != last_frame_count:
+                pixel_count = (new_frame.shape[0] * new_frame.shape[1])
+
                 frame = new_frame
                 ips.add()
                 last_frame_count = frame_count
@@ -454,14 +470,14 @@ def do(colours):
 
                 # show fps
             fps.add()
-            cvh.draw_text(frame,
-                          str(fps.fps) + 'fps ' +
-                          str(ips.fps) + 'pips' +
-                          str(vs.fps()) + 'cips', (5, 20), (255, 255, 255))
+            if frame is not None:
+                cvh.draw_text(frame,
+                              str(fps.fps) + 'fps ' +
+                              str(ips.fps) + 'pips' +
+                              str(vs.fps()) + 'cips', (5, 20), (255, 255, 255))
 
-            if showvideo:
-                cv2.imshow('frame', frame)
-
+                if showvideo:
+                    cv2.imshow('frame', frame)
 
             server.serveonce()  # this is slow....
 
@@ -492,11 +508,13 @@ def do(colours):
 
     stopWebServerInSeperateProcess(web_server)
     # pygame.mixer.quit()
-    #if IS_RASPBERRY_PI:
+    # if IS_RASPBERRY_PI:
 
 
 # https://stackoverflow.com/questions/18204782/runtimeerror-on-windows-trying-python-multiprocessing
 if __name__ == '__main__':
+
+
 
     colours = [
         Colour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),

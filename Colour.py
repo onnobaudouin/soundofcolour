@@ -30,7 +30,8 @@ class Colour:
     def filename(self):
         return self.name + '.json'
 
-    def as_numpy(self, hsv_as_array):
+    @staticmethod
+    def as_numpy(hsv_as_array):
         return np.array(hsv_as_array)
 
     def update(self, low, high):

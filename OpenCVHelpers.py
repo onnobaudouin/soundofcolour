@@ -5,11 +5,11 @@ import cv2
 def mean_and_stddev_of_circle(source_image, center=(0, 0), radius=1):
     # todo: use ROI
 
-    WIDTH = 0
-    HEIGHT = 1
-    circle_mask = np.zeros((source_image.shape[WIDTH], source_image.shape[HEIGHT]), dtype=np.uint8)
+    width_index = 0
+    height_index = 1
+    circle_mask = np.zeros((source_image.shape[width_index], source_image.shape[height_index]), dtype=np.uint8)
     cv2.circle(circle_mask, center, int(radius), (255, 255, 255), cv2.FILLED)
-    #cv2.imshow('samplemask', image_from_mask(source_image, circle_mask))
+    # cv2.imshow('samplemask', image_from_mask(source_image, circle_mask))
 
     mean_colour, stds = cv2.meanStdDev(source_image, mask=circle_mask)
 
@@ -40,9 +40,10 @@ def draw_shadow_arrow(frame, from_point, to_point, colour=(255, 255, 255), thick
                     color=(0, 0, 0), thickness=thickness)
     cv2.arrowedLine(img=frame, pt1=from_point, pt2=to_point, color=colour, thickness=thickness)
 
+
 def draw_line(frame, from_point, to_point, colour=(255, 255, 255), thickness=1):
     cv2.line(img=frame, pt1=from_point, pt2=to_point, color=colour, thickness=thickness)
-    
-    
+
+
 def draw_rect(frame, from_point, to_point, colour=(255, 255, 255), thickness=1):
     cv2.rectangle(img=frame, pt1=from_point, pt2=to_point, color=colour, thickness=thickness)

@@ -1,6 +1,5 @@
 import sys
 import json
-from pprint import pprint
 
 
 class JSON:
@@ -9,7 +8,7 @@ class JSON:
         try:
             with open(filename) as data_file:
                 data = json.load(data_file)
-           # pprint(data)
+
             return data
         except:
             print("Unexpected error:", sys.exc_info()[0])
@@ -20,8 +19,8 @@ class JSON:
     def save(filename, data):
         try:
             with open(filename, 'w') as data_file:
-                json_data = json.dumps(data)
-              #  pprint(json_data)
+                json_data = json.dumps(data,indent=2)
+
                 data_file.write(json_data)
                 print("saved: " + filename)
             return True
