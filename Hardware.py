@@ -1,5 +1,6 @@
 import io
 
+# todo refactor to class
 # https://raspberrypi.stackexchange.com/questions/5100/detect-that-a-python-program-is-running-on-the-pi
 
 
@@ -43,3 +44,5 @@ def is_raspberry_pi(raise_on_errors=False):
             return False
 
     return True
+
+

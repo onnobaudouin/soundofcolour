@@ -5,15 +5,16 @@ from Hardware import *
 import MouseInteraction as mouse
 from Colour import Colour
 import OpenCVHelpers as cvh
-from FramesPerSecond import FramesPerSecond
+from framespersecond import FramesPerSecond
 import time
-from VideoStream import VideoStream
+from videostream import VideoStream
 from BallTracker import BallTracker
 from OctaveGrid import OctaveGrid
 from soundsocketserver import SoundSocketServer
 from simplewebserver import *
 from web import *
 from propertiesopencvui import *
+from transitions import Machine  # https://github.com/pytransitions/transitions
 
 
 def setup_pygame_mixer():
@@ -329,6 +330,11 @@ def end_stabilize(vs):
         vs.stream.camera.exposure_mode = 'off'
 
 
+
+
+
+
+
 def do(colours):
     global stabilizing_counter
     global state
@@ -348,14 +354,17 @@ def do(colours):
         colour = colours2.group(name)
         colour.add('min_hsv', PropType.hsv)
         colour.add('max_hsv', PropType.hsv)
-    # pprint(props.as_dict())
-    props.load('pi.json')
+
+    if IS_RASPBERRY_PI:
+        filename = "pi.json"
+    else:
+        filename = "onno.json"
+
+    props.load(filename)
 
     prop_ui = PropertiesOpenCVUI(props)
     prop_ui.show('colours/blue')
 
-    # pprint(props.as_dict())
-    # props.save('pi.json')
 
     try:
         # //full
@@ -368,10 +377,10 @@ def do(colours):
             resolution = (4 * mult, 3 * mult + 4)
             framerate = 30
         else:
-            resolution = (int(1280 / 2) , int(720 / 2))
+            resolution = (int(1280 / 2), int(720 / 2))
             framerate = 60
 
-        vs = VideoStream(usePiCamera=IS_RASPBERRY_PI, resolution=resolution, framerate=framerate)
+        vs = VideoStream(use_pi_camera=IS_RASPBERRY_PI, resolution=resolution, frame_rate=framerate)
 
         if IS_RASPBERRY_PI:
             vs.stream.camera.hflip = True
@@ -387,10 +396,13 @@ def do(colours):
 
         grid = OctaveGrid(res_x, res_y, padding=10, divisions_x=10, divisions_y=2)
 
-        # pprint(vs)
-        cv2.namedWindow('frame')  # for mouse events
 
-        mouse.connect('frame')
+        main_window_name = 'frame'
+
+        # pprint(vs)
+        cv2.namedWindow(main_window_name)  # for mouse events
+
+        mouse.connect(main_window_name)
 
         prep_ui()
 
@@ -400,7 +412,7 @@ def do(colours):
 
         ball_tracker = BallTracker(res_x)
 
-        showvideo = True
+        show_video = True
         last_frame_count = -1
 
         web_server = startWebServerInSeperateProcess(8000)
@@ -448,7 +460,7 @@ def do(colours):
                         hsv = cvh.bgr_to_hsv(mean[0], mean[1], mean[2])
                         cvh.draw_text(frame, str(hsv) + ' ' + str(stddev), m.draw_last_pos)
 
-                    if (len(grid_messages) > 0):
+                    if len(grid_messages) > 0:
                         sound_messages = []
                         for message in grid_messages:
                             colour, ball_size, dx, dy = message
@@ -465,19 +477,15 @@ def do(colours):
                 # print("Same Frame: " + str(frame_count) + ' = ' + str(last_frame_count))
                 pass
 
-
-
-
-                # show fps
-            fps.add()
+            fps.add()  # show fps
             if frame is not None:
                 cvh.draw_text(frame,
                               str(fps.fps) + 'fps ' +
                               str(ips.fps) + 'pips' +
                               str(vs.fps()) + 'cips', (5, 20), (255, 255, 255))
 
-                if showvideo:
-                    cv2.imshow('frame', frame)
+                if show_video:
+                    cv2.imshow(main_window_name, frame)
 
             server.serveonce()  # this is slow....
 
@@ -486,7 +494,7 @@ def do(colours):
             if key == ord('q'):
                 break
             if key == ord('t'):
-                showvideo = not showvideo
+                show_video = not show_video
 
             if key == ord('s'):
                 start_stabilize(vs)
@@ -513,9 +521,6 @@ def do(colours):
 
 # https://stackoverflow.com/questions/18204782/runtimeerror-on-windows-trying-python-multiprocessing
 if __name__ == '__main__':
-
-
-
     colours = [
         Colour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),
         Colour(name="green", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 0]),

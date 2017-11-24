@@ -4,10 +4,10 @@ import sys
 import MouseInteraction as mouse
 from Colour import Colour
 import OpenCVHelpers as cvh
-from FramesPerSecond import FramesPerSecond
+from framespersecond import FramesPerSecond
 import time
 from pprint import pprint
-from VideoStream import VideoStream
+from videostream import VideoStream
 from Ball import Ball
 from BallTracker import BallTracker
 from OctaveGrid import OctaveGrid
@@ -361,7 +361,7 @@ def do(colours):
         #//1296 x 730
         #//
         mult = 100 #120 is fine for 30fps, 2 colours
-        vs = VideoStream(usePiCamera=1, resolution=(4 * mult,3 * mult +4 ), framerate=30)
+        vs = VideoStream(use_pi_camera=1, resolution=(4 * mult, 3 * mult + 4), frame_rate=30)
         
         vs.stream.camera.hflip = True
         vs.start()

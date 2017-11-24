@@ -1,7 +1,7 @@
 from enum import Enum
 import sys
 from JSON import JSON
-from pprint import pprint
+# from pprint import pprint
 import collections
 
 
@@ -14,6 +14,7 @@ class PropType(Enum):
     hsv = 6
     string = 7
     float = 8
+
 
 # TODO: cleanup the type system with classes...
 # class PropInt:
@@ -95,6 +96,7 @@ class Property:
         self._value = None
         self.name = name
         self.names = []
+        self.dirty = False
 
         if self.type == PropType.unsigned_int:
             self.min = 0
@@ -114,11 +116,11 @@ class Property:
         elif self.type == PropType.rgb:
             self.min = (0, 0, 0)
             self.max = (255, 255, 255)
-            self.names = ["red","green","blue"]
+            self.names = ["red", "green", "blue"]
         elif self.type == PropType.hsv:
             self.min = (0, 0, 0)
             self.max = (180, 255, 255)
-            self.names = ["hue","saturation","luminosity"]
+            self.names = ["hue", "saturation", "luminosity"]
         if self.default is None:
             if self.is_single_numeric():
                 self.default = 0
@@ -150,22 +152,23 @@ class Property:
             return ma
         return val
 
-    def set(self, value, index=None):
+    # returns True if value was changed
+    def set(self, value, index=None, from_runtime_change=False):
+        temp_value = self.value()
         if self.is_single_numeric():
             self._value = self.clip(value, self.min, self.max)
         if self.type in Property.numeric_tuple:
-            if len(value) == len(self.min):
+            if (index is not None) and (index < len(self.min)):
+                t = list(self._value)
+                t[index] = self.clip(value, self.min[index], self.max[index])
+                self._value = tuple(t)
+            elif len(value) == len(self.min):
                 p = []
                 # surely there is a more python way...
                 for v, mi, ma in zip(value, self.min, self.max):
                     p.append(self.clip(v, mi, ma))
                 self._value = tuple(p)
-            else if index is not None and index < len(self.min):
-                t = list(self._value)
-                t[index] = value
-                self._value = tuple(t)
-                
-                    
+
         if self.type == PropType.bool:
             if value == 0 or value is False:
                 self._value = False
@@ -173,6 +176,12 @@ class Property:
                 self._value = True
             else:
                 self._value = self.default
+
+        was_changed = temp_value != self.value()
+        if from_runtime_change:
+            self.dirty = was_changed or self.dirty
+
+        return was_changed
 
     def value(self):
         return self._value
@@ -205,6 +214,8 @@ class Properties:
         self.props = collections.OrderedDict()
         self.groups = collections.OrderedDict()
         self.name = name
+        self.path = None
+        # self.dirty = False
         if window_name is None:
             self.window_name = self.name
 
@@ -241,12 +252,36 @@ class Properties:
             JSON.save(path, d)
         pass
 
+    def is_dirty(self):
+        for key, p in self.props.items():
+            if p.dirty:
+                return True
+        for key, g in self.groups.items():
+            if g.is_dirty():
+                return True
+        return False
+
+    def clean(self):
+        for key, p in self.props.items():
+            p.dirty = False
+        for key, g in self.groups.items():
+            g.clean()
+
+    def update_permanent_storage(self):
+        if self.path is not None and self.is_dirty():
+            self.save(self.path)
+            self.clean()
+
     def load(self, path, file_type="json"):
         if file_type == "json":
             data = JSON.load(path)
+            self.path = path
             if data is not None:
                 self.from_dict(data)
-
+                print("loaded: " + self.path)
+            else:
+                self.from_dict(self.as_dict())
+                print("loaded from defaults")
         pass
 
     def set(self, name, value):
@@ -265,7 +300,7 @@ class Properties:
                 return None
             if isinstance(node, Property):
                 return node
-            # node should be a properties so continue
+                # node should be a properties so continue
         return node
 
     def node(self, node_name):
@@ -274,10 +309,6 @@ class Properties:
         if node_name in self.groups:
             return self.groups[node_name]
         return None
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -295,6 +326,6 @@ if __name__ == "__main__":
         colour.add('min_hsv', PropType.hsv)
         colour.add('max_hsv', PropType.hsv)
     # pprint(props.as_dict())
-    props.load('pi.json')
+    props.load('test.json')
     # pprint(props.as_dict())
-    props.save('pi.json')
+    props.save('test.json')
