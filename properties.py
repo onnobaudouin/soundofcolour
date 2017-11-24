@@ -94,6 +94,7 @@ class Property:
         self.max = None
         self._value = None
         self.name = name
+        self.names = []
 
         if self.type == PropType.unsigned_int:
             self.min = 0
@@ -113,10 +114,11 @@ class Property:
         elif self.type == PropType.rgb:
             self.min = (0, 0, 0)
             self.max = (255, 255, 255)
+            self.names = ["red","green","blue"]
         elif self.type == PropType.hsv:
             self.min = (0, 0, 0)
             self.max = (180, 255, 255)
-
+            self.names = ["hue","saturation","luminosity"]
         if self.default is None:
             if self.is_single_numeric():
                 self.default = 0
@@ -148,7 +150,7 @@ class Property:
             return ma
         return val
 
-    def set(self, value):
+    def set(self, value, index=None):
         if self.is_single_numeric():
             self._value = self.clip(value, self.min, self.max)
         if self.type in Property.numeric_tuple:
@@ -158,6 +160,12 @@ class Property:
                 for v, mi, ma in zip(value, self.min, self.max):
                     p.append(self.clip(v, mi, ma))
                 self._value = tuple(p)
+            else if index is not None and index < len(self.min):
+                t = list(self._value)
+                t[index] = value
+                self._value = tuple(t)
+                
+                    
         if self.type == PropType.bool:
             if value == 0 or value is False:
                 self._value = False
@@ -193,10 +201,12 @@ class Property:
 
 
 class Properties:
-    def __init__(self, name=None):
+    def __init__(self, name=None, window_name=None):
         self.props = collections.OrderedDict()
         self.groups = collections.OrderedDict()
         self.name = name
+        if window_name is None:
+            self.window_name = self.name
 
     def group(self, name):
         p = Properties(name)

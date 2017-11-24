@@ -1,4 +1,5 @@
 from properties import *
+from functools import partial
 import cv2
 
 
@@ -8,25 +9,49 @@ class PropertiesOpenCVUI:
 
     def nothing(self, x):
         pass
+    
+    def barCallBack(self, prop, value, index=None):
+        
+        prop.set(value, index)
+        
+        
+    def createBar(self,prop_name, window_name, minimum, maximum, callback):
+        if callback is None:
+            callback = self.nothing
+        cv2.createTrackbar(prop_name, window_name, minimum, maximum, callback)
+    
+    def setBarPos(elf, prop_name, window_name, value):
+        cv2.setTrackbarPos(prop_name, window_name, value)    
+        
 
     def show(self, node_path):
         node = self.properties.node_from_path(node_path)
         if isinstance(node, Properties):
             props = node.props
-            name = node_path
-            cv2.namedWindow(name)  # todo: better name in json?
+            window_name = node_path
+            cv2.namedWindow(window_name)  # todo: better name in json?
             for prop_key in props:
                 prop = props[prop_key]
-                if prop.type == PropType.hsv:
-                    cv2.createTrackbar(prop.name + '_hue', name, prop.min[0], prop.max[0], self.nothing)
-                    cv2.createTrackbar(prop.name + '_sat', name, prop.min[1], prop.max[1], self.nothing)
-                    cv2.createTrackbar(prop.name + '_lum', name, prop.min[2], prop.max[2], self.nothing)
-                if prop.type == PropType.rgb:
-                    cv2.createTrackbar(prop.name + '_red', name, prop.min[0], prop.max[0], self.nothing)
-                    cv2.createTrackbar(prop.name + '_green', name, prop.min[1], prop.max[1], self.nothing)
-                    cv2.createTrackbar(prop.name + '_blue', name, prop.min[2], prop.max[2], self.nothing)
+                if prop.type in [PropType.hsv, PropType.rgb]:
+                    for i in range(0, len(prop.min)):
+                        self.createBar(prop.name + '_' + prop.names[i], 
+                            window_name, prop.min[i], prop.max[i], lambda x: self.barCallBack(prop, x, i))
                 if prop.type == PropType.unsigned_int:
-                    cv2.createTrackbar(prop.name, name, prop.min, prop.max, self.nothing)
+                    self.createBar(prop.name, window_name, prop.min, prop.max, lambda x: self.barCallBack(prop, x))
                 if prop.type == PropType.bool:
-                    cv2.createTrackbar(prop.name, name, 0, 1, self.nothing)
+                    self.createBar(prop.name, window_name, 0, 1, lambda x: self.barCallBack(prop, x))
+        self.update(node_path)
 
+    def update(self, node_path):
+        node = self.properties.node_from_path(node_path)
+        if isinstance(node, Properties):
+            props = node.props
+            window_name = node_path
+            for prop_key in props:
+                prop = props[prop_key]
+                if prop.type in [PropType.hsv, PropType.rgb]:
+                    for i in range(0, len(prop.min)):
+                        self.setBarPos(prop.name + '_' + prop.names[i], window_name, prop.value()[i])
+                else:
+                    self.setBarPos(prop.name, window_name, prop.value())
+                   

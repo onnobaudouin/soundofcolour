@@ -1,0 +1,16 @@
+1. install pyton 3.5.x and check if it works in command line
+
+python
+
+
+2. exit() to quit. 
+
+gto https://www.scivision.co/install-opencv-python-windows/
+
+we will use option 2. 
+
+So we download the .whl file (use +contrib edition)
+
+then copy it someher and install it...
+
+http://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_colorspaces/py_colorspaces.html
