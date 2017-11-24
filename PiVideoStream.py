@@ -1,58 +1,43 @@
-# import the necessary packages
-# these will only be loaded on RPI...
 from picamera.array import PiRGBArray
 from picamera import PiCamera
-from threading import Thread
-from FramesPerSecond import FramesPerSecond
+from videostream import VideoStream
 
 
-class PiVideoStream:
-    def __init__(self, resolution=(320, 240), framerate=32):
-        # initialize the camera and stream
+class PiVideoStream(VideoStream):
+    def __init__(self, wanted_resolution, wanted_frame_rate):
+        super().__init__(wanted_resolution, wanted_frame_rate)
         self.camera = PiCamera()
-        self.camera.resolution = resolution
-        self.camera.framerate = framerate
-        self.rawCapture = PiRGBArray(self.camera, size=resolution)
-        self.stream = self.camera.capture_continuous(self.rawCapture,
+        self.camera.resolution = wanted_resolution
+        self.camera.framerate = wanted_frame_rate
+        self.raw_capture = PiRGBArray(self.camera, size=wanted_resolution)
+
+        self.stream = self.camera.capture_continuous(self.raw_capture,
                                                      format="bgr", use_video_port=True)
 
-        # initialize the frame and the variable used to indicate
-        # if the thread should be stopped
-        self.frame = None
-        self.frame_count = 0
-        self.stopped = False
-        self.fps = FramesPerSecond()
-
-    def start(self):
-        # start the thread to read frames from the video stream
-        t = Thread(target=self.update, args=())
-        t.daemon = True
-        t.start()
-        return self
-
     def update(self):
-        # keep looping infinitely until the thread is stopped
-        for f in self.stream:
-            # pprint(f)
-            # grab the frame from the stream and clear the stream in
-            # preparation for the next frame
-            self.frame = f.array
-            self.rawCapture.truncate(0)
-            self.frame_count = self.frame_count + 1
-            self.fps.add()
-
-            # if the thread indicator variable is set, stop the thread
-            # and resource camera resources
-            if self.stopped:
+        for frame in self.stream:  # todo check if we need to use 'with'
+            if self.is_stopping:
                 self.stream.close()
-                self.rawCapture.close()
+                self.raw_capture.close()
                 self.camera.close()
+                self.stopped()
                 return
+            self.set_frame(frame)
+            self.raw_capture.truncate(0)
 
-    def read(self):
-        # return the frame most recently read
-        return self.frame
+    def flip_horizontal(self, flip=True):
+        self.camera.hflip = flip
 
-    def stop(self):
-        # indicate that the thread should be stopped
-        self.stopped = True
+    # def resolution(self):
+     #   return self.camera.resolution
+
+    def on_start_stabilize(self):
+        self.camera.exposure_mode = 'auto'
+        self.camera.awb_mode = "auto"  # PiCamera.AWB_MODES, aslo awb_gain
+
+    def on_stop_stabilize(self):
+        gains = self.camera.awb_gains
+        self.camera.awb_mode = "off"
+        self.camera.awb_gains = gains
+        self.camera.exposure_mode = 'off'
+

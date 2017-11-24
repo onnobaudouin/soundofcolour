@@ -10,6 +10,7 @@ class FramesPerSecond:
     @staticmethod
     def get_time():
         return cv2.getTickCount()
+        # return time.perf_counter()
 
     @staticmethod
     def time_difference_in_seconds(last, new):
