@@ -1,11 +1,11 @@
-from Hardware import *
+from hardware import *
 import MouseInteraction as mouse
 from Colour import Colour
-import OpenCVHelpers as cvh
+import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 
 from videostream import VideoStream
-from BallTracker import BallTracker
+from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
 from soundsocketserver import SoundSocketServer
 from simplewebserver import *
@@ -27,6 +27,7 @@ class SoundOfColour(object):
         self.has_received_first_valid_frame = False
         self.grid = None
         self.state = None
+        self.ball_tracker
 
     def start_state(self, new_state):
         print("change state from " + str(self.state) + " -> " + str(new_state))
@@ -90,6 +91,7 @@ class SoundOfColour(object):
         print("updating to resolution: " + str(resolution))
         width, height = resolution
         self.grid = OctaveGrid(width, height, padding=10, divisions_x=10, divisions_y=2)
+        self.ball_tracker = BallTracker(width)
         pass
 
     def update(self):

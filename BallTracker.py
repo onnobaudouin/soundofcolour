@@ -1,4 +1,4 @@
-from Ball import Ball
+from ball import Ball
 import sys
 
 

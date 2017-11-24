@@ -1,4 +1,4 @@
-import OpenCVHelpers as cvh
+import opencvhelpers as cvh
 import math
 
 

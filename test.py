@@ -1,14 +1,14 @@
 import numpy as np
 import cv2
 import sys
-from Hardware import *
+from hardware import *
 import MouseInteraction as mouse
 from Colour import Colour
-import OpenCVHelpers as cvh
+import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
 from videostream import VideoStream
-from BallTracker import BallTracker
+from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
 from soundsocketserver import SoundSocketServer
 from simplewebserver import *

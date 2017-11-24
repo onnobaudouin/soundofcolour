@@ -3,13 +3,13 @@ import cv2
 import sys
 import MouseInteraction as mouse
 from Colour import Colour
-import OpenCVHelpers as cvh
+import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
 from pprint import pprint
 from videostream import VideoStream
-from Ball import Ball
-from BallTracker import BallTracker
+from ball import Ball
+from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
 #from psonic import *
 import math
