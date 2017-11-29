@@ -290,9 +290,21 @@ class Properties:
         else:
             print("No Such property: " + name)
 
-    def node_from_path(self, node_path):
+    def node_path_of(self, node_path):
         if isinstance(node_path, str):
-            node_path = node_path.split('/')
+            return node_path.split('/')
+        return node_path
+
+    def value_of(self, node_path):
+        node = self.node_from_path(node_path)
+        if node is not None:
+            return node.value()
+        else:
+            raise ValueError('Path does not result in a valid Node: ' + node_path)
+
+    def node_from_path(self, node_path):
+
+        node_path = self.node_path_of(node_path)
         node = self
         for node_name in node_path:
             node = node.node(node_name)

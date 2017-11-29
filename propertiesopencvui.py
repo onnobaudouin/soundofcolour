@@ -30,7 +30,7 @@ class PropertiesOpenCVUI:
         if isinstance(node, Properties):
             props = node.props
             window_name = node_path
-            cv2.namedWindow(window_name)  # todo: better name in json?
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # todo: better name in json?
             for prop_key in props:
                 prop = props[prop_key]
                 if prop.type in [PropType.hsv, PropType.rgb]:

@@ -4,20 +4,18 @@ import math
 class Ball:
     next_id = 0
 
-    def __init__(self, ball_tuple):
+    def __init__(self, colour, pos, radius, area, contour=None):
         self.id = self.get_new_id()
-
-        colour, radius, pos, area = ball_tuple
-
         self.colour = colour
         self.pos = pos
         self.radius = radius
         self.area = area
+
         # self.velocity = None
         self.dead_frames = 0
         self.alive_frames = 0
         self.matched = False
-
+        self.contour = contour
         self.division = None
 
     @staticmethod
@@ -26,13 +24,12 @@ class Ball:
         Ball.next_id = Ball.next_id + 1
         return new_id
 
-    def update(self, ball_tuple):
-        colour, radius, pos, area = ball_tuple
+    def update(self, ball):
+        self.colour = ball.colour
+        self.pos = ball.pos
+        self.radius = ball.radius
+        self.area = ball.area
+        self.contour = ball.contour
 
-        self.colour = colour
-        self.pos = pos
-        self.radius = radius
-        self.area = area
-
-    def area_of_circle(self):
+    def area(self):
         return self.radius * self.radius * math.pi

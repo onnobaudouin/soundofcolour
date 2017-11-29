@@ -38,8 +38,6 @@ class VideoStream:
         print("stopped video stream...")
         self.is_stopped = True
 
-
-
     def update(self):
         # process each frame
         raise NotImplementedError

@@ -1,11 +1,14 @@
-from ball import Ball
 import sys
+from ball import Ball
 
 
 class BallTracker:
-    def __init__(self, width):
+    def __init__(self):
         self.balls = []
-        distance = width * 0.075
+        #  distance = width * 0.075
+        self.max_distance_squared = None
+
+    def set_max_distance(self, distance):
         self.max_distance_squared = distance * distance
 
     def update(self, new_balls):
@@ -17,7 +20,7 @@ class BallTracker:
             if best_match_ball is not None:
                 best_match_ball.update(new_ball)
             else:
-                best_match_ball = Ball(new_ball)
+                best_match_ball = new_ball
                 self.balls.append(best_match_ball)
 
             best_match_ball.matched = True
@@ -42,7 +45,7 @@ class BallTracker:
 
         return ret
 
-    def best_matching(self, new_ball):
+    def best_matching(self, new_ball: Ball):
         if len(self.balls) == 0:
             return None
 
@@ -65,15 +68,14 @@ class BallTracker:
                 min_object = c
         return min_object
 
-    def compare(self, ball, new_ball):
-        if ball.matched:
+    def compare(self, existing_ball, new_ball: Ball):
+        if existing_ball.matched:
             return None
-        colour, radius, pos, area = new_ball
-        if ball.colour != colour:
+        if existing_ball.colour['name'] != new_ball.colour['name']:
             return None
         return (
-            ball,
-            self.distance_squared(ball.pos, pos),
+            existing_ball,
+            self.distance_squared(existing_ball.pos, new_ball.pos),
             0
         )
 
