@@ -1,4 +1,4 @@
-from SimpleWebSocketServer import SimpleWebSocketServer, WebSocket
+from simplewebsocketserver import SimpleWebSocketServer, WebSocket
 import time
 
 

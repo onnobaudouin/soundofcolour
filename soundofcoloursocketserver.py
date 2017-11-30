@@ -2,7 +2,7 @@ from simplewebsocketserver import SimpleWebSocketServer, WebSocket
 import time
 
 
-class SoundSocket(WebSocket):
+class SoundOfColourSocket(WebSocket):
     def handleMessage(self):
 
         for client in self.server.clients:
@@ -22,14 +22,19 @@ class SoundSocket(WebSocket):
             client.sendMessage(self.address[0] + u' - disconnected')
 
 
-class SoundSocketServer(SimpleWebSocketServer):
-    def __init__(self, host, port):
+class SoundOfColourSocketServer(SimpleWebSocketServer):
+    def __init__(self, host='', port=8001):
         self.clients = []
-        super().__init__(host, port, SoundSocket, 0.001)
+        super().__init__(host, port, SoundOfColourSocket, 0.001)
+        print("Socket Server Listening on port: " + str(port))
+
+    def send_to_all(self, message):
+        for client in self.clients:
+            client.sendMessage(message)
 
 
 if __name__ == "__main__":
-    server = SimpleWebSocketServer('', 8000, SoundSocket)
+    server = SoundOfColourSocketServer(port=8001)
     while True:
         server.serveonce()
         time.sleep(3)
