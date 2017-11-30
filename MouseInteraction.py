@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+import opencvhelpers as cvh
 
 # mouse = []
 # 'EVENT_FLAG_ALTKEY',
@@ -25,20 +25,22 @@ import numpy as np
 
 class MouseInteraction:
     DRAWING = 1
+    NONE = None
 
     def __init__(self):
         self.mode = None
-        self.draw_pos = None
-        self.draw_size = None
-        self.draw_last_pos = None
+        self.original_pos = None
+        self.radius = None
+        self.pos = None
 
-    def handle_event(self, event, x, y, flags, param):
-        if self.mode is None:
+    def handle_event(self, event, x, y, flags=None, param=None):
+        self.pos = (x, y)
+        if self.mode == MouseInteraction.NONE:
             if event == cv2.EVENT_RBUTTONDOWN:
                 self.mode = MouseInteraction.DRAWING
-                self.draw_pos = (x, y)
-                self.draw_last_pos = (x, y)
-                self.draw_size = 3
+                self.original_pos = (x, y)
+
+                self.radius = 3
                 return
         if self.mode == MouseInteraction.DRAWING:
             #  if event == cv2.EVENT_MOUSEWHEEL:
@@ -49,33 +51,28 @@ class MouseInteraction:
             #          offset = -1
             #      self.draw_size = self.draw_size + offset
             if event == cv2.EVENT_MOUSEMOVE:
-                self.draw_last_pos = (x, y)
-                dx = x - self.draw_pos[0]
-                dy = y - self.draw_pos[1]
-
+                dx = x - self.original_pos[0]
+                dy = y - self.original_pos[1]
                 dist = max(int(np.math.sqrt(dx * dx + dy * dy)), 1)
                 # if dist <= 0:
                 #    dist = 1
-                self.draw_size = dist
+                self.radius = dist
 
             if event == cv2.EVENT_RBUTTONUP:
-                self.mode = None
-                self.draw_pos = None
-                self.draw_size = 3
+                self.mode = MouseInteraction.NONE
+                self.original_pos = None
+                self.radius = 3
 
+    def attach_to_window(self, window_name):
+        cv2.setMouseCallback(window_name,
+                             lambda event, x, y, flags, param: self.handle_event(event, x, y, flags, param))
 
-mouseInteraction = MouseInteraction()
+    def draw_on(self, frame, sampling_frame):
+        (mean, stddev) = cvh.mean_and_stddev_of_circle(sampling_frame, self.original_pos, self.radius)
+        hsv = cvh.bgr_to_hsv(mean[0], mean[1], mean[2])
+        cv2.circle(frame, self.original_pos, self.radius, (255, 0, 0), 1)
+        cvh.draw_shadow_arrow(frame, self.original_pos, self.pos)
+        cvh.draw_disc(frame, self.original_pos, radius=5, colour=mean)
+        p = [int(x) for x in stddev]
+        cvh.draw_text(frame, str(hsv) + ' ' + str(p), self.pos)
 
-
-def handler(event, x, y, flags, param):
-    global mouseInteraction
-    mouseInteraction.handle_event(event, x, y, flags, param)
-
-
-def connect(window_name):
-    cv2.setMouseCallback(window_name, handler)
-
-
-def mouse():
-    global mouseInteraction
-    return mouseInteraction
