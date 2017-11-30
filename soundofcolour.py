@@ -1,6 +1,5 @@
 from hardware import *
-import MouseInteraction as mouse
-from Colour import Colour
+from mouseinteraction import MouseInteraction
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 
@@ -13,8 +12,9 @@ from web import *
 from propertiesopencvui import *
 import numpy as np
 from transitions import Machine  # https://github.com/pytransitions/transitions
-from collections import namedtuple
-from ball import Ball
+from trackedball import TrackedBall
+from trackedcolour import TrackedColour
+from stateengine import *
 
 
 class SoundOfColour(object):
@@ -29,12 +29,19 @@ class SoundOfColour(object):
         self.main_window_name = 'frame'
         self.has_received_first_valid_frame = False
         self.grid = None
-        self.state = None
         self.ball_tracker = BallTracker()
+        self.mouse = MouseInteraction()
+        self.main_loop_fps = FramesPerSecond()
 
-    def change_state_to(self, new_state):
-        print("change state from " + str(self.state) + " -> " + str(new_state))
-        self.state = new_state
+        self.frame = None
+        self.state = StateEngine()
+        self.state.add("wait_for_first_frame",
+                       run=lambda x=self: x.run_wait_for_first_frame())
+        self.state.add("stabilize",
+                       start=lambda x=self: x.start_stabilize(),
+                       run=lambda x=self: x.run_stabilize())
+        self.state.add("normal",
+                       run=lambda x=self: x.run_normal())
 
     def start_video_stream(self) -> VideoStream:
         recommended_video_resolution, recommended_frame_rate = self.recommended_video_resolution_and_frame_rate()
@@ -69,6 +76,8 @@ class SoundOfColour(object):
 
     def show_properties(self):
         self.properties_ui.show('colours/blue')
+        self.properties_ui.show('colours/pink')
+        self.properties_ui.show('colours/green')
         self.properties_ui.show('ui')
 
     def close_properties(self):
@@ -81,7 +90,7 @@ class SoundOfColour(object):
         ui.add("min_circle", PropType.unsigned_int, maximum=250)
         ui.add("max_circle", PropType.unsigned_int, maximum=250)
         ui.add("show_masks", PropType.bool)
-        ui.add("min_area", PropType.unsigned_int)
+        ui.add("min_area", PropType.unsigned_int, maximum=1920)
 
         colours2 = props.group("colours")
         col = ["blue", "green", "yellow", "orange", "pink"]
@@ -135,13 +144,14 @@ class SoundOfColour(object):
         new_balls = []
 
         for colour in colours:
-            mask = self.mask_of_colour(hsv_frame, colour['min'], colour['max'])
+            mask = self.mask_of_colour(hsv_frame, colour.minimum_hsv, colour.maximum_hsv)
 
+            # TODO: optimize for platform as usefull
             # # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel(), iterations=1)
             # # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel(), iterations=2)
-            colour['mask'] = mask
+            colour.mask = mask
             #
-            contours = self.contours_of_colour_range_in(colour['mask'])
+            contours = self.contours_of_colour_range_in(colour.mask)
 
             for contour in contours:
                 # todo profile which is the quickest bounce
@@ -156,7 +166,7 @@ class SoundOfColour(object):
                         # if m00 != 0:
                         #   center = (int(moments["m10"] / m00), int(moments["m01"] / m00))
                         #  cv2.circle(img=frame, center=center, radius=3, color=(0, 0, 255), thickness=cv2.FILLED)
-                        ball = Ball(
+                        ball = TrackedBall(
                             colour=colour,
                             radius=radius,
                             pos=(x, y),
@@ -168,20 +178,20 @@ class SoundOfColour(object):
         return new_balls, colours
 
     def colours_to_track(self):
-        # todo: optimize
-        colour_infos = []
+        # todo: optimize with dirty versioning and return same as before
+        # or dirty manual checking...
+        tracked_colours = []
         colours_node = self.properties.node_from_path('colours')
         for (key, colour_node) in colours_node.groups.items():
             if colour_node.value_of('enabled') is True:
-                colour_info = dict(
-                    mask=None,
+                tracked_colour = TrackedColour(
                     name=colour_node.name,
-                    min=np.array(colour_node.value_of('min_hsv')),
-                    max=np.array(colour_node.value_of('max_hsv')),
+                    minimum_hsv=np.array(colour_node.value_of('min_hsv')),
+                    maximum_hsv=np.array(colour_node.value_of('max_hsv')),
                     rgb=colour_node.value_of('rgb')
                 )
-                colour_infos.append(colour_info)
-        return colour_infos
+                tracked_colours.append(tracked_colour)
+        return tracked_colours
 
     def process_frame(self, frame):
         active_colours = self.colours_to_track()
@@ -205,15 +215,20 @@ class SoundOfColour(object):
         show_masks = self.properties.value_of('ui/show_masks')
         if show_masks is True:
             for colour in active_colours:
-                cv2.imshow('mask_' + colour['name'], colour['mask'])
-#
-        DRAW_ALL = -1
+                cv2.imshow('mask_' + colour.name, colour.mask)
+                #
+        cv_draw_all = -1
         for ball in balls_in_frame:
-            cv2.drawContours(frame, [ball.contour], DRAW_ALL, self.bgr_of(ball.colour['rgb']))
+            cv2.drawContours(frame, [ball.contour], cv_draw_all, self.bgr_of(ball.colour.rgb))
             (x, y) = ball.pos
-            cv2.circle(frame, (int(x), int(y)), int(ball.radius),  self.bgr_of(ball.colour['rgb']), thickness=1)
+            cv2.circle(frame, (int(x), int(y)), int(ball.radius), self.bgr_of(ball.colour.rgb), thickness=1)
 
         self.ball_tracker.update(balls_in_frame)
+
+        for ball in self.ball_tracker.balls:
+            x = int(ball.pos[0])
+            y = int(ball.pos[1])
+            cvh.draw_text(frame, str(ball.id), (x, y))
 
         return frame
 
@@ -221,55 +236,74 @@ class SoundOfColour(object):
         (r, g, b) = rgb
         return (b, g, r)
 
-
     def update(self):
         vs = self.video_stream
         new_frame, last_valid_frame, frame_count, resolution = vs.latest()
         if new_frame is not None:
-            # on resolution confirmation / change
-            if not self.has_received_first_valid_frame:
-                self.change_resolution(resolution)
-                self.has_received_first_valid_frame = True
+            self.frame = new_frame
 
-            # original = cvh.clone_image(new_frame) # only needed when masking colours!
+            sampling_frame = None
 
-            if self.state == 'stabilize':
-                if vs.is_stabilizing:
-                    cvh.draw_text(new_frame, str(vs.stabilize_frame_counter) +
-                                  ' stabilising', (5, 40), (255, 255, 255))
-                else:
-                    self.change_state_to('normal')
+            if self.mouse.mode == MouseInteraction.DRAWING:
+                sampling_frame = cvh.clone_image(self.frame)
 
-            if self.state == 'normal':
-                new_frame = self.process_frame(new_frame)
+            self.state.run()
 
-                cvh.draw_text(new_frame,
-                         # str(fps.fps) + 'fps ' +
-                         # str(ips.fps) + 'pips' +
-                          str(vs.frames_per_second.fps) + 'video fps', (5, 20), (255, 255, 255))
+            # mouse overlay
+            if self.mouse.mode == MouseInteraction.DRAWING:
+                self.mouse.draw_on(self.frame, sampling_frame)
 
-            # print("frame: " + str(frame_count) +
-            #       ' fps:' + str(self.video_stream.frames_per_second.fps) +
-            #       'bounced: ' + str(self.video_stream.duplicate_frames_per_second_requests.fps))
-            cv2.imshow(self.main_window_name, new_frame)
+            cvh.draw_text(self.frame, "frame: " + str(frame_count) +
+                          ' fps:' + str(self.video_stream.frames_per_second.fps) +
+                          ' bounced: ' + str(self.video_stream.duplicate_frames_per_second_requests.fps) +
+                          ' loops/sec: ' + str(self.main_loop_fps.fps), pos=(10, int(self.video_stream.resolution_of(self.frame)[1]-20)))
+
+            cv2.imshow(self.main_window_name, self.frame)
 
     def run(self):
         self.show_properties()
         try:
             self.video_stream = self.start_video_stream()
             cv2.namedWindow(self.main_window_name)  # for mouse events
-            self.change_state_to('stabilize')  # todo: wrap in state machine
-            self.video_stream.start_stabilize()
+            self.mouse.attach_to_window(self.main_window_name)
+            self.state.start('wait_for_first_frame')
+
             while True:
+                self.main_loop_fps.add()
                 self.update()
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
+                if key == ord("s"):
+                    self.state.start("stabilize")
+
         except KeyboardInterrupt:
-            print("CRTL+C")
+            print("CRTL + C")
         finally:
             self.close_properties()
             self.video_stream.start_stop()
+
+    def run_wait_for_first_frame(self):
+        self.change_resolution(self.video_stream.resolution_of(self.frame))
+        self.state.start("stabilize")
+
+    def start_stabilize(self):
+        print("start stabilizing image to allow white balance to be set by camera")
+        self.video_stream.start_stabilize()
+
+    def run_stabilize(self):
+        if self.video_stream.is_stabilizing:
+            cvh.draw_text(self.frame, str(self.video_stream.stabilize_frame_counter) +
+                          ' stabilising', (5, 40), (255, 255, 255))
+        else:
+            self.state.start("normal")
+
+    def run_normal(self):
+        self.frame = self.process_frame(self.frame)
+        #cvh.draw_text(self.frame,
+        #              # str(fps.fps) + 'fps ' +
+        #              # str(ips.fps) + 'pips' +
+        #              str(self.video_stream.frames_per_second.fps) + 'video fps', (5, 20), (255, 255, 255))
 
 
 if __name__ == '__main__':

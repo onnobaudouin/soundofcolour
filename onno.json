@@ -1,14 +1,14 @@
 {
   "ui": {
-    "blur": 7,
-    "min_circle": 0,
-    "max_circle": 125,
-    "show_masks": false,
-    "min_area": 0
+    "blur": 26,
+    "min_circle": 9,
+    "max_circle": 96,
+    "show_masks": true,
+    "min_area": 13
   },
   "colours": {
     "blue": {
-      "enabled": true,
+      "enabled": false,
       "rgb": [
         0,
         0,
@@ -26,7 +26,7 @@
       ]
     },
     "green": {
-      "enabled": true,
+      "enabled": false,
       "rgb": [
         0,
         0,
@@ -82,19 +82,19 @@
     "pink": {
       "enabled": true,
       "rgb": [
+        255,
         0,
-        0,
-        0
+        255
       ],
       "min_hsv": [
-        0,
-        0,
-        0
+        118,
+        49,
+        85
       ],
       "max_hsv": [
-        0,
-        0,
-        0
+        180,
+        255,
+        255
       ]
     }
   }

@@ -16,8 +16,8 @@ def mean_and_stddev_of_circle(source_image, center=(0, 0), radius=1):
     return np.concatenate(mean_colour).flatten(), np.concatenate(stds).flatten()
 
 
-def draw_text(image, text, pos=(0, 50), color=(255, 255, 255)):
-    cv2.putText(image, text=text, org=pos, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=color)
+def draw_text(image, text, pos=(0, 50), color=(255, 255, 255), size=0.5, align=None):
+    cv2.putText(image, text=text, org=pos, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=size, color=color)
 
 
 def image_from_mask(image, mask):
@@ -47,3 +47,7 @@ def draw_line(frame, from_point, to_point, colour=(255, 255, 255), thickness=1):
 
 def draw_rect(frame, from_point, to_point, colour=(255, 255, 255), thickness=1):
     cv2.rectangle(img=frame, pt1=from_point, pt2=to_point, color=colour, thickness=thickness)
+
+
+def draw_disc(frame, center, radius, colour):
+    cv2.circle(img=frame, center=center, radius=radius, color=colour, thickness=cv2.FILLED)

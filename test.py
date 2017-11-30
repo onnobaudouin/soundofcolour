@@ -2,8 +2,8 @@ import numpy as np
 import cv2
 import sys
 from hardware import *
-import MouseInteraction as mouse
-from Colour import Colour
+import mouseinteraction as mouse
+from trackedcolour import TrackedColour
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
@@ -522,10 +522,10 @@ def do(colours):
 # https://stackoverflow.com/questions/18204782/runtimeerror-on-windows-trying-python-multiprocessing
 if __name__ == '__main__':
     colours = [
-        Colour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),
-        Colour(name="green", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 0]),
-        Colour(name="yellow", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 255]),
-        Colour(name="pink", low=[0, 0, 0], high=[255, 255, 255], rgb=[255, 0, 255]),
+        TrackedColour(name="blue", low=[54, 171, 154], high=[130, 255, 255], rgb=[255, 0, 0]),
+        TrackedColour(name="green", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 0]),
+        TrackedColour(name="yellow", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 255, 255]),
+        TrackedColour(name="pink", low=[0, 0, 0], high=[255, 255, 255], rgb=[255, 0, 255]),
         #   Colour(name="ornage", low=[0, 0, 0], high=[255, 255, 255], rgb=[0, 165, 255])
     ]
 

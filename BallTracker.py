@@ -1,5 +1,5 @@
 import sys
-from ball import Ball
+from trackedball import TrackedBall
 
 
 class BallTracker:
@@ -45,7 +45,7 @@ class BallTracker:
 
         return ret
 
-    def best_matching(self, new_ball: Ball):
+    def best_matching(self, new_ball: TrackedBall):
         if len(self.balls) == 0:
             return None
 
@@ -68,10 +68,10 @@ class BallTracker:
                 min_object = c
         return min_object
 
-    def compare(self, existing_ball, new_ball: Ball):
+    def compare(self, existing_ball, new_ball: TrackedBall):
         if existing_ball.matched:
             return None
-        if existing_ball.colour['name'] != new_ball.colour['name']:
+        if existing_ball.colour.name != new_ball.colour.name:
             return None
         return (
             existing_ball,

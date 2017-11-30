@@ -1,7 +1,7 @@
 import math
 
 
-class Ball:
+class TrackedBall:
     next_id = 0
 
     def __init__(self, colour, pos, radius, area, contour=None):
@@ -16,12 +16,13 @@ class Ball:
         self.alive_frames = 0
         self.matched = False
         self.contour = contour
-        self.division = None
+        # self.division = None
 
     @staticmethod
     def get_new_id():
-        new_id = Ball.next_id
-        Ball.next_id = Ball.next_id + 1
+        # todo compress id's?
+        new_id = TrackedBall.next_id
+        TrackedBall.next_id = TrackedBall.next_id + 1
         return new_id
 
     def update(self, ball):
