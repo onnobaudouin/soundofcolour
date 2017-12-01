@@ -18,12 +18,7 @@ class SoundOfColour:
         #    print('number of balls: ' + str(len(balls)))
         messages = []
         for ball in balls:
-            msg = []
-            msg.append(ball.id)
-            msg.append(ball.colour.name)
-            msg.append(ball.radius)
-            msg.append(int(ball.pos[0]))
-            msg.append(int(ball.pos[1]))
+            msg = [ball.id, ball.colour.name, ball.radius, int(ball.pos[0]), int(ball.pos[1])]
             msg = ",".join([str(i) for i in msg])
             messages.append(msg)
         message = ";".join(messages)
@@ -43,4 +38,3 @@ class SoundOfColour:
 if __name__ == '__main__':
     soc = SoundOfColour()
     soc.run()
-
