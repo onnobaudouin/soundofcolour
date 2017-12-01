@@ -1,48 +1,48 @@
 {
   "tracker": {
-    "blur": 36,
-    "min_circle": 0,
-    "max_circle": 0,
-    "min_area": 0
+    "blur": 24,
+    "min_circle": 3,
+    "max_circle": 39,
+    "min_area": 13
   },
   "ui": {
-    "show_masks": false
+    "show_masks": true
   },
   "colours": {
     "blue": {
-      "enabled": false,
+      "enabled": true,
       "rgb": [
         0,
         0,
         255
       ],
       "min_hsv": [
-        96,
-        126,
+        92,
+        145,
         105
       ],
       "max_hsv": [
-        113,
-        240,
+        117,
+        255,
         226
       ]
     },
     "green": {
-      "enabled": false,
+      "enabled": true,
       "rgb": [
         0,
-        0,
+        255,
         0
       ],
       "min_hsv": [
-        0,
-        0,
-        0
+        22,
+        103,
+        183
       ],
       "max_hsv": [
-        0,
-        0,
-        0
+        32,
+        238,
+        255
       ]
     },
     "yellow": {

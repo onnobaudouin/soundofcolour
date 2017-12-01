@@ -138,6 +138,11 @@ class ColouredBallTracker(object):
     def hue_saturation_value_frame_of(self, bgr_frame):
         return cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
 
+    def resolution(self):
+        if self.frame is not None:
+            return self.video_stream.resolution_of(self.frame)
+        return -1, -1
+
     def coloured_balls_in(self, bgr_frame, colours, min_enclosing=0, max_enclosing=20,
                           min_area_in_pixels=10000000):
         # this is SLOW
@@ -297,8 +302,10 @@ class ColouredBallTracker(object):
             self.show_properties()
             cv2.namedWindow(self.main_window_name)  # for mouse events
             self.mouse.attach_to_window(self.main_window_name)
+            print("showing UI")
         else:
             self.close_properties()
+            print("not showing UI")
             # what to do with MOUSe???
 
     def run(self):

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sound Of Colour</title>
+    <script language="javascript" type="text/javascript">
+        class SoundOfColourServer {
+            constructor(url, canvasID) {
+                this.url = url;  //e.g. "ws://localhost:8001/"
+                this.websocket = null;
+                this.auto_reconnect = true;
+                this.auto_reconnect_interval_id = null;
+                this.openHandler = evt => this.open(evt);
+                this.closeHandler = evt => this.close(evt);
+                this.messageHandler = evt => this.message(evt);
+                this.errorHandler = evt => this.error(evt);
+
+
+                this.balls = [];
+                this.resolution = {width:0, height:0};
+                /*@var Canvas */
+                this.canvas = document.getElementById(canvasID);
+                this.ctx = this.canvas.getContext("2d");
+
+            }
+
+            connect() {
+                clearInterval(this.auto_reconnect_interval_id);
+                try {
+                    this.websocket = new WebSocket(this.url);
+                } catch (ex) {
+                    console.log(ex+' port probably closed');
+                    this.websocket = null;
+                    return;
+                }
+                this.connect_handlers();
+
+            }
+
+            connect_handlers() {
+                this.websocket.addEventListener('open', this.openHandler);
+                this.websocket.addEventListener('close', this.closeHandler);
+                this.websocket.addEventListener('message', this.messageHandler);
+                this.websocket.addEventListener('error', this.errorHandler);
+            }
+
+            disconnect_handlers() {
+                this.websocket.removeEventListener('open', this.openHandler);
+                this.websocket.removeEventListener('close', this.closeHandler);
+                this.websocket.removeEventListener('message', this.messageHandler);
+                this.websocket.removeEventListener('error', this.errorHandler);
+            }
+
+            open(event) {
+                console.log('connection open');
+            }
+
+            //https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
+            close(close_event) {
+                console.log('connection closed: ' + close_event.code + ' ' + close_event.reason);
+                this.do_auto_reconnect();
+            }
+
+            send(message) {
+                if (this.websocket !== null) {
+                    this.websocket.send(message);
+                }
+            }
+
+            //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
+            message(message_event) {
+                const message = message_event.data;
+                console.log('connection message: '+ message);
+                if (message.indexOf('Welcome') !== -1) {
+                    this.send('show_ui');
+                } else {
+                    const parts = message.split(';');
+                    this.resolution.width = parseInt(parts[0]);
+                    this.resolution.height = parseInt(parts[1]);
+                    if (
+                         (this.resolution.width !== this.canvas.width) ||
+                         (this.resolution.height !== this.canvas.height) ) {
+                        this.canvas.width = this.resolution.width;
+                        this.canvas.height = this.resolution.height;
+                    }
+
+                    this.balls = []; //todo: optimize
+                    for (let i = 2; i < parts.length; i++) {
+                        const ball_info = parts[i];
+                        const ball_parts = ball_info.split(',');
+                        const ball = {
+                            id:parseInt(ball_parts[0]),
+                            colour:ball_parts[1],
+                            radius:parseFloat(ball_parts[2]),
+                            x:parseInt(ball_parts[3]),
+                            y:parseInt(ball_parts[4])
+                        };
+                        this.balls.push(ball);
+                    }
+
+                    // should be in som performance timer?
+                    this.clear();
+                    this.draw_balls()
+                }
+            }
+
+            clear() {
+                this.ctx.fillStyle="black";
+                //ctx.fillRect(0,0,300,150);
+                this.ctx.fillRect( 0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+            }
+
+            draw_disc(x, y, radius, colour) {
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+                this.ctx.fillStyle = colour;
+                this.ctx.fill();
+            }
+
+            draw_balls() {
+                this.balls.forEach(ball => {
+                   this.draw_disc(ball.x, ball.y, ball.radius, ball.colour)
+
+                });
+
+
+            }
+
+
+            error(event) {
+                console.log('connection error: ' + event.type);
+                this.do_auto_reconnect();
+            }
+
+            do_auto_reconnect() {
+                this.disconnect_handlers();
+                this.websocket.close();
+                this.websocket = null;
+                if (this.auto_reconnect) {
+                    console.log('will attempt reconnect in 1 second');
+                    this.auto_reconnect_interval_id = setInterval(() => this.connect(), 1000)
+                }
+            }
+
+
+        }
+
+
+
+
+    </script>
+
+</head>
+<body>
+   <canvas id="frame"></canvas>
+<script>
+    let soc = new SoundOfColourServer("ws://localhost:8001/", 'frame');
+    soc.connect();
+</script>
+
+</body>
+</html>
