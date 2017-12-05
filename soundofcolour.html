@@ -68,37 +68,42 @@
                 }
             }
 
+            update_canvas_size(width, height) {
+                this.resolution.width = width;
+                this.resolution.height = height;
+                if (
+                    (this.resolution.width !== this.canvas.width) ||
+                    (this.resolution.height !== this.canvas.height) ) {
+                    this.canvas.width = this.resolution.width;
+                    this.canvas.height = this.resolution.height;
+                }
+            }
+
             //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
             message(message_event) {
                 const message = message_event.data;
                 console.log('connection message: '+ message);
                 if (message.indexOf('Welcome') !== -1) {
-                    //this.send('show_ui');
+                    this.send('show_ui');
                 } else {
-                    const parts = message.split(';');
-                    this.resolution.width = parseInt(parts[0]);
-                    this.resolution.height = parseInt(parts[1]);
-                    if (
-                         (this.resolution.width !== this.canvas.width) ||
-                         (this.resolution.height !== this.canvas.height) ) {
-                        this.canvas.width = this.resolution.width;
-                        this.canvas.height = this.resolution.height;
+                    const obj = JSON.parse(message);
+                    switch (obj.type) {
+                        case "balls":
+                            this.update_canvas_size(obj.resolution[0], obj.resolution[1]);
+                            //wrap balls up in simple object
+                             this.balls = obj.balls.map(b => {
+                                return {
+                                    id:parseInt(b[0]),
+                                    colour:b[1],
+                                    radius:parseFloat(b[2]),
+                                    x:parseInt(b[3]),
+                                    y:parseInt(b[4])
+                                };
+                            });
+                            break;
+                        default:
+                            console.log('Unknown message type: '+obj.type)
                     }
-
-                    this.balls = []; //todo: optimize
-                    for (let i = 2; i < parts.length; i++) {
-                        const ball_info = parts[i];
-                        const ball_parts = ball_info.split(',');
-                        const ball = {
-                            id:parseInt(ball_parts[0]),
-                            colour:ball_parts[1],
-                            radius:parseFloat(ball_parts[2]),
-                            x:parseInt(ball_parts[3]),
-                            y:parseInt(ball_parts[4])
-                        };
-                        this.balls.push(ball);
-                    }
-
                     // should be in som performance timer?
                     this.clear();
                     this.draw_balls()

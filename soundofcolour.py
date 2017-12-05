@@ -1,7 +1,7 @@
 from colouredballtracker import ColouredBallTracker
 import time
 from soundofcoloursocketserver import SoundOfColourSocketServer
-
+import json
 
 class SoundOfColour:
     def __init__(self):
@@ -18,17 +18,37 @@ class SoundOfColour:
         # if count != self.ball_count:
         #    self.ball_count = count
         #    print('number of balls: ' + str(len(balls)))
-        messages = []
-        for ball in balls:
-            msg = [ball.id, ball.colour.name, ball.radius, int(ball.pos[0]), int(ball.pos[1])]
-            msg = ",".join([str(i) for i in msg])
-            messages.append(msg)
-        message = ";".join(messages)
-        if message != "":
-            width, height = self.tracker.resolution()
-            message = str(width) + ';' + str(height) + ";" +  message
+        # messages = []
+        # for ball in balls:
+        #     msg = [ball.id, ball.colour.name, ball.radius, int(ball.pos[0]), int(ball.pos[1])]
+        #     msg = ",".join([str(i) for i in msg])
+        #     messages.append(msg)
+        # message = ";".join(messages)
+        # if message != "":
+        #     width, height = self.tracker.resolution()
+        #     message = str(width) + ';' + str(height) + ";" +  message
+        #
+        #     self.socket_server.send_to_all(message)
+        self.send_balls_information(balls)
 
-            self.socket_server.send_to_all(message)
+    def send_balls_information(self, balls):
+        ball_info = []
+        for ball in balls:
+            ball_info.append([ball.id, ball.colour.name, int(ball.radius), int(ball.pos[0]), int(ball.pos[1])])
+        self.send_to_client(dict(
+            balls=ball_info,
+            resolution=list(self.tracker.resolution())
+        ), 'balls')
+
+    def dict_to_json(self, message_dict):
+        return json.dumps(message_dict, separators=(',', ':'))
+
+    def send_to_client(self, message, type=None):
+        message["type"] = type
+        message_json = self.dict_to_json(message);
+        self.socket_server.send_to_all(message_json)
+
+
 
     def on_client_connected(self, socket):
         print("client connected")
