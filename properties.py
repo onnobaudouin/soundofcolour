@@ -1,6 +1,6 @@
 from enum import Enum
 import sys
-from JSON import JSON
+from json import JSON
 # from pprint import pprint
 import collections
 
