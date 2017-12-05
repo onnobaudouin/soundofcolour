@@ -2,10 +2,11 @@ import sys
 import json
 
 
-class JSON:
+class JSONFile:
     @staticmethod
     def load(filename):
         try:
+            print("Loading JSON File: " + filename)
             with open(filename) as data_file:
                 data = json.load(data_file)
 

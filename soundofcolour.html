@@ -25,6 +25,7 @@
             }
 
             connect() {
+                console.log("Connecting...");
                 clearInterval(this.auto_reconnect_interval_id);
                 try {
                     this.websocket = new WebSocket(this.url);
@@ -72,7 +73,7 @@
                 const message = message_event.data;
                 console.log('connection message: '+ message);
                 if (message.indexOf('Welcome') !== -1) {
-                    this.send('show_ui');
+                    //this.send('show_ui');
                 } else {
                     const parts = message.split(';');
                     this.resolution.width = parseInt(parts[0]);
@@ -154,7 +155,8 @@
 <body>
    <canvas id="frame"></canvas>
 <script>
-    let soc = new SoundOfColourServer("ws://localhost:8001/", 'frame');
+    //ws://
+    let soc = new SoundOfColourServer("ws://127.0.0.1:8001", 'frame');
     soc.connect();
 </script>
 

@@ -22,7 +22,7 @@ class PiVideoStream(VideoStream):
                 self.camera.close()
                 self.stopped()
                 return
-            self.set_frame(frame)
+            self.set_frame(frame.array)
             self.raw_capture.truncate(0)
 
     def flip_horizontal(self, flip=True):

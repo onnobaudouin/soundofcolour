@@ -1,70 +1,102 @@
 {
+  "tracker": {
+    "blur": 1,
+    "min_circle": 3,
+    "max_circle": 39,
+    "min_area": 13
+  },
   "ui": {
-    "blur": 0,
-    "min_circle": 5,
-    "max_circle": 200,
-    "show_masks": false,
-    "min_area": 5
+    "show_masks": false
   },
   "colours": {
     "blue": {
+      "enabled": true,
+      "rgb": [
+        0,
+        0,
+        255
+      ],
       "min_hsv": [
-        49,
-        98,
-        122
+        101,
+        99,
+        148
       ],
       "max_hsv": [
-        101,
-        183,
-        217
+        112,
+        166,
+        226
       ]
     },
     "green": {
+      "enabled": true,
+      "rgb": [
+        0,
+        255,
+        0
+      ],
       "min_hsv": [
-        42,
-        32,
-        35
+        22,
+        103,
+        183
       ],
       "max_hsv": [
-        97,
-        255,
-        223
+        32,
+        238,
+        255
       ]
     },
     "yellow": {
+      "enabled": true,
+      "rgb": [
+        0,
+        0,
+        0
+      ],
       "min_hsv": [
-        16,
-        74,
-        110
+        0,
+        0,
+        0
       ],
       "max_hsv": [
-        32,
-        189,
-        167
+        0,
+        0,
+        0
       ]
     },
     "orange": {
+      "enabled": true,
+      "rgb": [
+        0,
+        0,
+        0
+      ],
       "min_hsv": [
-        180,
-        134,
-        63
+        0,
+        0,
+        0
       ],
       "max_hsv": [
-        180,
-        255,
-        238
+        0,
+        0,
+        0
       ]
     },
     "pink": {
+      "enabled": true,
+      "rgb": [
+        255,
+        0,
+        255
+      ],
       "min_hsv": [
-        149,
-        86,
-        77
+        118,
+        49,
+        85
       ],
       "max_hsv": [
-        175,
+        180,
         255,
-        164
+        255
       ]
     }
   }

@@ -1,6 +1,6 @@
 from enum import Enum
 import sys
-from json import JSON
+from jsonfile import JSONFile
 # from pprint import pprint
 import collections
 
@@ -249,7 +249,7 @@ class Properties:
     def save(self, path, file_type="json"):
         if file_type == "json":
             d = self.as_dict()
-            JSON.save(path, d)
+            JSONFile.save(path, d)
         pass
 
     def is_dirty(self):
@@ -274,7 +274,7 @@ class Properties:
 
     def load(self, path, file_type="json"):
         if file_type == "json":
-            data = JSON.load(path)
+            data = JSONFile.load(path)
             self.path = path
             if data is not None:
                 self.from_dict(data)
