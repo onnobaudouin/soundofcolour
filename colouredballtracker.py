@@ -33,6 +33,7 @@ class ColouredBallTracker(object):
         self.is_showing_ui = None
 
         self.frame = None
+        self.last_frame = None
         self.state = StateEngine()
         self.state.add("wait_for_first_frame",
                        run=lambda x=self: x.run_wait_for_first_frame())
@@ -251,6 +252,9 @@ class ColouredBallTracker(object):
         (r, g, b) = rgb
         return (b, g, r)
 
+
+
+
     def update(self):
         vs = self.video_stream
         new_frame, last_valid_frame, frame_count, resolution = vs.latest()
@@ -276,6 +280,10 @@ class ColouredBallTracker(object):
 
             if self.is_showing_ui:
                 cv2.imshow(self.main_window_name, self.frame)
+
+            self.last_frame = cvh.clone_image(self.frame)
+
+
 
     def start(self):
         self.thread = Thread(target=self.run, args=())

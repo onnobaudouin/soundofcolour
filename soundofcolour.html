@@ -23,6 +23,10 @@
                 this.ctx = this.canvas.getContext("2d");
                 this.show_ui = false;
 
+
+                this.frame_grabber_id = null;
+                this.is_grabbing_frame = false;
+
             }
 
             connect() {
@@ -55,6 +59,24 @@
 
             open(event) {
                 console.log('connection open');
+
+                this.frame_grabber_id  = setInterval(() => this.check_frame_grabber(), 20);
+            }
+
+            check_frame_grabber() {
+                if (this.is_connected()) {
+                    //console.log('request a frame');
+                    if (this.is_grabbing_frame === false) {
+                        this.is_grabbing_frame = true;
+                        this.send("frame",
+                            { 'quality' : 50, 'format': 'png', ratio: 0.25
+                              });
+                        return;
+                    } else {
+                        //console.log('Bounced');
+                    }
+                }
+                this.is_grabbing_frame = false;
             }
 
             //https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
@@ -80,7 +102,7 @@
                 }
             }
 
-            send(message, type) {
+            send(type, message) {
                 message.type = type;
                 this.send_raw(JSON.stringify(message));
             }
@@ -107,6 +129,21 @@
                                     y:parseInt(b[4])
                                 };
                             });
+                            break;
+                        case "frame":
+                            //console.log("image_received");
+                            let src = false;
+                            if (obj.image.format === "jpg") {
+                                src = 'data:image/jpg;base64,' + obj.image.data;
+                            }
+                            else if (obj.image.format === "png") {
+                                src = 'data:image/png;base64,' + obj.image.data;
+                            }
+                            if (src !== false) {
+                                let img = document.getElementById('test');
+                                img.src = src;
+                            }
+                            this.is_grabbing_frame = false;
                             break;
                         default:
                             console.log('Unknown message type: '+obj.type)
@@ -145,10 +182,22 @@
                 this.do_auto_reconnect();
             }
 
-            do_auto_reconnect() {
+            is_connected() {
+                if(this.websocket !== null) {
+                    return (this.websocket.readyState === this.websocket.OPEN);
+                }
+            }
+
+            disconnected() {
                 this.disconnect_handlers();
                 this.websocket.close();
                 this.websocket = null;
+            }
+
+            do_auto_reconnect() {
+                this.disconnected();
+
+
                 if (this.auto_reconnect) {
                     console.log('will attempt reconnect in 1 second');
                     this.auto_reconnect_interval_id = setInterval(() => this.connect(), 1000)
@@ -162,7 +211,7 @@
             }
 
             update_show_ui() {
-                this.send({"value": this.show_ui}, "show_ui");
+                this.send("show_ui", {"value": this.show_ui} );
             }
 
 
@@ -179,6 +228,7 @@
 <body>
     <div>
    <canvas id="frame"></canvas>
+        <img id="test">
     </div>
    <button onclick="soc.toggle_ui()">Toggle UI</button>
 <script>
