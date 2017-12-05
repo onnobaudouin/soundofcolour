@@ -302,6 +302,14 @@ class Properties:
         else:
             raise ValueError('Path does not result in a valid Node: ' + node_path)
 
+    def set_value_of(self, node_path, value, from_run_time=False):
+        node = self.node_from_path(node_path)
+        if node is not None:
+            return node.set(value=value, from_runtime_change=from_run_time)
+        else:
+            print("eeror")
+            raise ValueError('Set Value Of : Path does not result in a valid Node: ' + node_path)
+
     def node_from_path(self, node_path):
 
         node_path = self.node_path_of(node_path)

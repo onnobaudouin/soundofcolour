@@ -91,6 +91,16 @@ class SoundOfColour:
                 ))
         elif type == "stabilize":
             self.tracker.state.start("stabilize")
+        elif type == "prop":
+            prop_path = message["path"]
+            prop_value = message["value"]
+            print("prop " + str(socket.data))
+            self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
+            self.tracker.properties_ui.update("tracker")
+        else:
+            print("unknown message: " + str(socket.data))
+
+
 
     def run(self):
         self.tracker.start()
