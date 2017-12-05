@@ -2,7 +2,6 @@ from colouredballtracker import ColouredBallTracker
 import time
 from soundofcoloursocketserver import SoundOfColourSocketServer
 import json
-from PIL import Image
 import cv2
 import base64
 import numpy as np
@@ -90,6 +89,8 @@ class SoundOfColour:
                         data=image,
                         format=format)
                 ))
+        elif type == "stabilize":
+            self.tracker.state.start("stabilize")
 
     def run(self):
         self.tracker.start()

@@ -5,21 +5,22 @@
     <title>Sound Of Colour</title>
     <script language="javascript" type="text/javascript">
         class SoundOfColourServer {
-            constructor(url, canvasID) {
+            constructor(url, canvasID, imageID) {
                 this.url = url;  //e.g. "ws://localhost:8001/"
                 this.websocket = null;
                 this.auto_reconnect = true;
                 this.auto_reconnect_interval_id = null;
-                this.openHandler = evt => this.open(evt);
-                this.closeHandler = evt => this.close(evt);
-                this.messageHandler = evt => this.message(evt);
-                this.errorHandler = evt => this.error(evt);
+                this.openHandler = evt => this.on_open(evt);
+                this.closeHandler = evt => this.on_close(evt);
+                this.messageHandler = evt => this.on_message(evt);
+                this.errorHandler = evt => this.on_error(evt);
 
 
                 this.balls = [];
-                this.resolution = {width:0, height:0};
+                this.resolution = {width: 0, height: 0};
                 /*@var Canvas */
                 this.canvas = document.getElementById(canvasID);
+                this.img = document.getElementById(imageID);
                 this.ctx = this.canvas.getContext("2d");
                 this.show_ui = false;
 
@@ -35,7 +36,7 @@
                 try {
                     this.websocket = new WebSocket(this.url);
                 } catch (ex) {
-                    console.log(ex+' port probably closed');
+                    console.log(ex + ' port probably closed');
                     this.websocket = null;
                     return;
                 }
@@ -57,10 +58,10 @@
                 this.websocket.removeEventListener('error', this.errorHandler);
             }
 
-            open(event) {
+            on_open(event) {
                 console.log('connection open');
 
-                this.frame_grabber_id  = setInterval(() => this.check_frame_grabber(), 20);
+                this.frame_grabber_id = setInterval(() => this.check_frame_grabber(), 20);
             }
 
             check_frame_grabber() {
@@ -69,8 +70,9 @@
                     if (this.is_grabbing_frame === false) {
                         this.is_grabbing_frame = true;
                         this.send("frame",
-                            { 'quality' : 50, 'format': 'png', ratio: 0.25
-                              });
+                            {
+                                'quality': 50, 'format': 'jpg', ratio: 1.0
+                            });
                         return;
                     } else {
                         //console.log('Bounced');
@@ -80,7 +82,7 @@
             }
 
             //https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
-            close(close_event) {
+            on_close(close_event) {
                 console.log('connection closed: ' + close_event.code + ' ' + close_event.reason);
                 this.do_auto_reconnect();
             }
@@ -96,7 +98,7 @@
                 this.resolution.height = height;
                 if (
                     (this.resolution.width !== this.canvas.width) ||
-                    (this.resolution.height !== this.canvas.height) ) {
+                    (this.resolution.height !== this.canvas.height)) {
                     this.canvas.width = this.resolution.width;
                     this.canvas.height = this.resolution.height;
                 }
@@ -109,9 +111,9 @@
 
 
             //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-            message(message_event) {
+            on_message(message_event) {
                 const message = message_event.data;
-               // console.log('message: '+ message);
+                // console.log('message: '+ message);
                 if (message.indexOf('Welcome') !== -1) {
                     this.update_show_ui();
                 } else {
@@ -120,13 +122,13 @@
                         case "balls":
                             this.update_canvas_size(obj.resolution[0], obj.resolution[1]);
                             //wrap balls up in simple object
-                             this.balls = obj.balls.map(b => {
+                            this.balls = obj.balls.map(b => {
                                 return {
-                                    id:parseInt(b[0]),
-                                    colour:b[1],
-                                    radius:parseFloat(b[2]),
-                                    x:parseInt(b[3]),
-                                    y:parseInt(b[4])
+                                    id: parseInt(b[0]),
+                                    colour: b[1],
+                                    radius: parseFloat(b[2]),
+                                    x: parseInt(b[3]),
+                                    y: parseInt(b[4])
                                 };
                             });
                             break;
@@ -140,13 +142,13 @@
                                 src = 'data:image/png;base64,' + obj.image.data;
                             }
                             if (src !== false) {
-                                let img = document.getElementById('test');
-                                img.src = src;
+
+                                this.img.src = src;
                             }
                             this.is_grabbing_frame = false;
                             break;
                         default:
-                            console.log('Unknown message type: '+obj.type)
+                            console.log('Unknown message type: ' + obj.type)
                     }
                     // should be in som performance timer?
                     this.clear();
@@ -155,9 +157,9 @@
             }
 
             clear() {
-                this.ctx.fillStyle="black";
+                this.ctx.fillStyle = "black";
                 //ctx.fillRect(0,0,300,150);
-                this.ctx.fillRect( 0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
             }
 
             draw_disc(x, y, radius, colour) {
@@ -169,21 +171,26 @@
 
             draw_balls() {
                 this.balls.forEach(ball => {
-                   this.draw_disc(ball.x, ball.y, ball.radius, ball.colour)
+                    this.draw_disc(ball.x, ball.y, ball.radius, ball.colour)
 
                 });
 
 
             }
 
+            close() {
+                if (this.is_connected()) {
+                    this.disconnected();
+                }
+            }
 
-            error(event) {
+            on_error(event) {
                 console.log('connection error: ' + event.type);
                 this.do_auto_reconnect();
             }
 
             is_connected() {
-                if(this.websocket !== null) {
+                if (this.websocket !== null) {
                     return (this.websocket.readyState === this.websocket.OPEN);
                 }
             }
@@ -211,30 +218,71 @@
             }
 
             update_show_ui() {
-                this.send("show_ui", {"value": this.show_ui} );
+                this.send("show_ui", {"value": this.show_ui});
             }
 
+            stabilize() {
+                this.send("stabilize", {"frames": 30});
+            }
 
 
 
         }
 
 
-
-
     </script>
 
 </head>
 <body>
+<div>
     <div>
-   <canvas id="frame"></canvas>
-        <img id="test">
+        <canvas id="frame1"></canvas>
+        <img id="test1">
     </div>
-   <button onclick="soc.toggle_ui()">Toggle UI</button>
+    <button onclick="soc1.toggle_ui()">Toggle UI</button>
+    <input type="text" value="127.0.0.1" id="ip1">
+    <button onclick="connect(1)">Connect</button>
+    <button onclick="stabilize(1)">Stabilize</button>
+</div>
+<div>
+    <div>
+        <canvas id="frame2"></canvas>
+        <img id="test2">
+    </div>
+    <button onclick="soc2.toggle_ui()">Toggle UI</button>
+    <input type="text" value="172.30.68.142" id="ip2">
+    <button onclick="connect(2)">Connect</button>
+    <button onclick="stabilize(2)">Stabilize</button>
+</div>
 <script>
     //ws://
-    let soc = new SoundOfColourServer("ws://127.0.0.1:8001", 'frame');
-    soc.connect();
+    let soc1 = null;
+    let soc2 = null;
+    function connect(index) {
+        let ip = document.getElementById('ip'+index);
+        let soc = soc1;
+        if (index === 2) {
+            soc = soc2;
+        }
+        if (soc !== null) {
+            soc.close();
+        }
+        soc = new SoundOfColourServer("ws://" + ip.value + ":8001", 'frame'+index, 'test'+index);
+        soc.connect();
+        if (index === 1) {
+            soc1 = soc;
+        } else {
+            soc2 = soc;
+        }
+    }
+    function stabilize(index) {
+        let soc = soc1;
+        if (index === 2) {
+            soc = soc2;
+        }
+        soc.stabilize();
+     }
+
 </script>
 
 </body>
