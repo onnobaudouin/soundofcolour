@@ -14,21 +14,6 @@ class SoundOfColour:
     def on_update(self):
         self.tracker.show_ui(self.show_ui)
         balls = self.tracker.balls()
-        # count = len(balls)
-        # if count != self.ball_count:
-        #    self.ball_count = count
-        #    print('number of balls: ' + str(len(balls)))
-        # messages = []
-        # for ball in balls:
-        #     msg = [ball.id, ball.colour.name, ball.radius, int(ball.pos[0]), int(ball.pos[1])]
-        #     msg = ",".join([str(i) for i in msg])
-        #     messages.append(msg)
-        # message = ";".join(messages)
-        # if message != "":
-        #     width, height = self.tracker.resolution()
-        #     message = str(width) + ';' + str(height) + ";" +  message
-        #
-        #     self.socket_server.send_to_all(message)
         self.send_balls_information(balls)
 
     def send_balls_information(self, balls):
@@ -56,9 +41,9 @@ class SoundOfColour:
 
     def on_client_message(self, socket):
         print("client message: " + str(socket.data))
-        message = socket.data
-        if message == "show_ui":
-            self.show_ui = True
+        message = json.loads(socket.data)
+        if message["type"] == "show_ui":
+            self.show_ui = bool(message["value"])
 
     def run(self):
         self.tracker.start()

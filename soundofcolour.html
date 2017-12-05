@@ -21,6 +21,7 @@
                 /*@var Canvas */
                 this.canvas = document.getElementById(canvasID);
                 this.ctx = this.canvas.getContext("2d");
+                this.show_ui = false;
 
             }
 
@@ -62,7 +63,7 @@
                 this.do_auto_reconnect();
             }
 
-            send(message) {
+            send_raw(message) {
                 if (this.websocket !== null) {
                     this.websocket.send(message);
                 }
@@ -79,12 +80,18 @@
                 }
             }
 
+            send(message, type) {
+                message.type = type;
+                this.send_raw(JSON.stringify(message));
+            }
+
+
             //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
             message(message_event) {
                 const message = message_event.data;
-                console.log('connection message: '+ message);
+               // console.log('message: '+ message);
                 if (message.indexOf('Welcome') !== -1) {
-                    this.send('show_ui');
+                    this.update_show_ui();
                 } else {
                     const obj = JSON.parse(message);
                     switch (obj.type) {
@@ -148,6 +155,18 @@
                 }
             }
 
+            toggle_ui() {
+                this.show_ui = !this.show_ui;
+                this.update_show_ui();
+
+            }
+
+            update_show_ui() {
+                this.send({"value": this.show_ui}, "show_ui");
+            }
+
+
+
 
         }
 
@@ -158,7 +177,10 @@
 
 </head>
 <body>
+    <div>
    <canvas id="frame"></canvas>
+    </div>
+   <button onclick="soc.toggle_ui()">Toggle UI</button>
 <script>
     //ws://
     let soc = new SoundOfColourServer("ws://127.0.0.1:8001", 'frame');
