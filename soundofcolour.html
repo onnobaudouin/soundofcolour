@@ -266,6 +266,7 @@
     <input type="text" value="172.30.68.142" id="ip2">
     <button onclick="connect(2)">Connect</button>
     <button onclick="stabilize(2)">Stabilize</button>
+    <div>Quality:<div id="2:frame/quality"></div></div>
 </div>
 <script src="nouislider.min.js"></script>
 <script>
@@ -328,6 +329,24 @@
         //inputFormat.value = values[handle];
         if (soc1 !== null) {
             soc1.quality(values[handle]);
+        }
+    });
+
+
+    let slider3 = document.getElementById("2:frame/quality");
+    noUiSlider.create(slider3, {
+        start: [0],
+        connect: true,
+        step: 1,
+        range: {
+            'min': 0,
+            'max': 100
+        }
+    });
+    slider3.noUiSlider.on('update', function( values, handle ) {
+        //inputFormat.value = values[handle];
+        if (soc2 !== null) {
+            soc2.quality(values[handle]);
         }
     });
 
