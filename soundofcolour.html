@@ -176,6 +176,12 @@
                 this.frame_quality = 30;
                 this.frame_grabber_id = null;
                 this.is_grabbing_frame = false;
+
+                this.message_handlers = {
+                    welcome: this.on_message_welcome,
+                    balls: this.on_message_balls,
+                    frame: this.on_message_frame
+                }
             }
 
             on_open(event) {
@@ -209,50 +215,54 @@
                 this.canvas2d.update_resolution(width, height);
             }
 
-            //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-            on_message(message_event) {
-                const message = message_event.data;
+            on_message_welcome() {
+                this.update_show_ui();
+            }
 
-                const obj = JSON.parse(message);
-                switch (obj.type) {
-                    case "welcome":
-                        this.update_show_ui();
-                        break;
-                    case "balls":
-                        this.update_canvas_size(obj.resolution[0], obj.resolution[1]);
-                        //wrap balls up in simple object
-                        this.balls = obj.balls.map(b => {
-                            return {
-                                id: parseInt(b[0]),
-                                colour: b[1],
-                                radius: parseFloat(b[2]),
-                                x: parseInt(b[3]),
-                                y: parseInt(b[4])
-                            };
-                        });
-                        break;
-                    case "frame":
-                        //console.log("image_received");
-                        let src = false;
-                        if (obj.image.format === "jpg") {
-                            src = 'data:image/jpg;base64,' + obj.image.data;
-                        }
-                        else if (obj.image.format === "png") {
-                            src = 'data:image/png;base64,' + obj.image.data;
-                        }
-                        if (src !== false) {
+            on_message_balls(message) {
+                this.update_canvas_size(message.resolution[0], message.resolution[1]);
+                //wrap balls up in simple object
+                this.balls = message.balls.map(b => {
+                    return {
+                        id: parseInt(b[0]),
+                        colour: b[1],
+                        radius: parseFloat(b[2]),
+                        x: parseInt(b[3]),
+                        y: parseInt(b[4])
+                    };
+                });
 
-                            this.img.src = src;
-                        }
-                        this.is_grabbing_frame = false;
-                        break;
-                    default:
-                        console.log('Unknown message type: ' + obj.type)
-                }
-                // should be in som performance timer?
                 this.canvas2d.clear();
                 this.draw_balls()
+            }
 
+            on_message_frame(message) {
+                //console.log("image_received");
+                let src = false;
+                if (message.image.format === "jpg") {
+                    src = 'data:image/jpg;base64,' + message.image.data;
+                }
+                else if (message.image.format === "png") {
+                    src = 'data:image/png;base64,' + message.image.data;
+                }
+                if (src !== false) {
+                    this.img.src = src;
+                }
+                this.is_grabbing_frame = false;
+            }
+
+
+            //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
+            on_message(message_event) {
+                const message_raw = message_event.data;
+                const message = JSON.parse(message_raw);
+                if ("type" in message) {
+                    if (message.type in this.message_handlers) {
+                        this.message_handlers[message.type](message_event);
+                    }
+                } else {
+                    console.log('unknown message :'+message_raw);
+                }
             }
 
             draw_balls() {
