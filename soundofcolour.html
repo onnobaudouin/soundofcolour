@@ -5,45 +5,74 @@
     <title>Sound Of Colour</title>
     <link href="nouislider.min.css" rel="stylesheet">
     <script language="javascript" type="text/javascript">
-        class SoundOfColourServer {
-            constructor(url, canvasID, imageID) {
+        class SocketClient {
+            constructor(url) {
                 this.url = url;  //e.g. "ws://localhost:8001/"
                 this.websocket = null;
                 this.auto_reconnect = true;
                 this.auto_reconnect_interval_id = null;
                 this.openHandler = evt => this.on_open(evt);
-                this.closeHandler = evt => this.on_close(evt);
+                this.closeHandler = evt => this.on_close_private(evt);
                 this.messageHandler = evt => this.on_message(evt);
-                this.errorHandler = evt => this.on_error(evt);
+                this.errorHandler = evt => this.on_error_private(evt);
+            }
 
+            on_open(event) {
+                console.log('connection open');
+            }
 
-                this.balls = [];
-                this.resolution = {width: 0, height: 0};
-                /*@var Canvas */
-                this.canvas = document.getElementById(canvasID);
-                this.img = document.getElementById(imageID);
-                this.ctx = this.canvas.getContext("2d");
-                this.show_ui = false;
-                this.frame_quality = 30;
+            on_close_private(close_event) {
+                console.log('connection closed: ' + close_event.code + ' ' + close_event.reason);
+                this.update_auto_reconnect();
+                this.on_close(close_event);
+            }
 
-
-                this.frame_grabber_id = null;
-                this.is_grabbing_frame = false;
+            on_close(close_event) {
 
             }
 
-            connect() {
-                console.log("Connecting...");
-                clearInterval(this.auto_reconnect_interval_id);
-                try {
-                    this.websocket = new WebSocket(this.url);
-                } catch (ex) {
-                    console.log(ex + ' port probably closed');
-                    this.websocket = null;
-                    return;
-                }
-                this.connect_handlers();
+            on_message(message_event) {
+                console.log('message received. size:' + message_event.data.length);
+            }
 
+            on_error_private(error_event) {
+                this.update_auto_reconnect();
+                this.on_error(error_event);
+            }
+
+            on_error(event) {
+                console.log('connection error: ' + event.type);
+            }
+
+            is_connected() {
+                if (this.websocket !== null) {
+                    return (this.websocket.readyState === this.websocket.OPEN);
+                }
+            }
+
+            disconnected() {
+                this.disconnect_handlers();
+                this.websocket.close();
+                this.websocket = null;
+            }
+
+            close() {
+                if (this.is_connected()) {
+                    this.disconnected();
+                }
+            }
+
+            update_auto_reconnect() {
+                this.disconnected();
+                if (this.auto_reconnect) {
+                    console.log('will attempt reconnect in 1 second');
+                    this.auto_reconnect_interval_id = setInterval(() => this.start_connect(), 1000)
+                }
+            }
+
+            stop_auto_reconnect() {
+                clearInterval(this.auto_reconnect_interval_id);
+                this.auto_reconnect_interval_id = null;
             }
 
             connect_handlers() {
@@ -60,22 +89,109 @@
                 this.websocket.removeEventListener('error', this.errorHandler);
             }
 
-            on_open(event) {
-                console.log('connection open');
+            send_raw(message) {
+                if (this.is_connected()) {
+                    this.websocket.send(message); //todo: probably has some errors it can throw
+                }
+            }
 
-                this.frame_grabber_id = setInterval(() => this.check_frame_grabber(), 20);
+            send_json(message) {
+                this.send_raw(JSON.stringify(message));
+            }
+
+            start_connect() {
+                console.log("Connecting...");
+                this.stop_auto_reconnect();
+                try {
+                    this.websocket = new WebSocket(this.url);
+                } catch (ex) {
+                    console.log(ex + ' port probably closed');
+                    this.websocket = null;
+                    return;
+                }
+                this.connect_handlers();
+            }
+        }
+    </script>
+    <script language="javascript" type="text/javascript">
+        class Canvas2D {
+            constructor(dom_id = null) {
+                this.ctx = null;
+                if (dom_id !== null) {
+                    let element = document.getElementById(dom_id);
+                    if (element !== null) {
+                        if (element.nodeName.toLowerCase() === 'canvas') {
+                            this.connect_to_canvas(element);
+                        }
+                    }
+                }
+            }
+
+            connect_to_canvas(canvas_element) {
+                this.canvas = canvas_element;
+                this.ctx = this.canvas.getContext("2d");
+            }
+
+            ready() {
+                return (this.ctx !== null);
+            }
+
+            clear() {
+                if (!this.ready()) return; //todo implement as empty functions?
+                this.ctx.fillStyle = "black";
+                //ctx.fillRect(0,0,300,150);
+                this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+            }
+
+            disc(x, y, radius, colour) {
+                if (!this.ready()) return; //todo implement as empty functions?
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+                this.ctx.fillStyle = colour;
+                this.ctx.fill();
+            }
+
+            update_resolution(width, height) {
+                if (
+                    (width !== this.canvas.width) ||
+                    (height !== this.canvas.height)) {
+                    this.canvas.width = width;
+                    this.canvas.height = height;
+                }
+            }
+        }
+
+    </script>
+
+    <script language="javascript" type="text/javascript">
+        class SoundOfColourServer extends SocketClient {
+            constructor(url, canvasID, imageID) {
+                super(url);
+                this.balls = [];
+                this.resolution = {width: 0, height: 0};
+                /*@var Canvas2D */
+                this.canvas2d = new Canvas2D(canvasID);
+                this.img = document.getElementById(imageID);
+                this.show_ui = false;
+                this.frame_quality = 30;
+                this.frame_grabber_id = null;
+                this.is_grabbing_frame = false;
+            }
+
+            on_open(event) {
+                this.frame_grabber_id = setInterval(() => this.maybe_request_frame(), 20);
             }
 
             quality(q) {
                 this.frame_quality = parseInt(q);
             }
 
-            check_frame_grabber() {
+            maybe_request_frame() {
                 if (this.is_connected()) {
                     //console.log('request a frame');
                     if (this.is_grabbing_frame === false) {
                         this.is_grabbing_frame = true;
-                        this.send("frame",
+                        this.send_message("frame",
                             {
                                 'quality': this.frame_quality, 'format': 'jpg', ratio: 1.0
                             });
@@ -87,155 +203,85 @@
                 this.is_grabbing_frame = false;
             }
 
-            //https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
-            on_close(close_event) {
-                console.log('connection closed: ' + close_event.code + ' ' + close_event.reason);
-                this.do_auto_reconnect();
-            }
-
-            send_raw(message) {
-                if (this.websocket !== null) {
-                    this.websocket.send(message);
-                }
-            }
-
             update_canvas_size(width, height) {
                 this.resolution.width = width;
                 this.resolution.height = height;
-                if (
-                    (this.resolution.width !== this.canvas.width) ||
-                    (this.resolution.height !== this.canvas.height)) {
-                    this.canvas.width = this.resolution.width;
-                    this.canvas.height = this.resolution.height;
-                }
+                this.canvas2d.update_resolution(width, height);
             }
-
-            send(type, message) {
-                message.type = type;
-                this.send_raw(JSON.stringify(message));
-            }
-
 
             //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
             on_message(message_event) {
                 const message = message_event.data;
-                // console.log('message: '+ message);
-                if (message.indexOf('Welcome') !== -1) {
-                    this.update_show_ui();
 
-                } else {
-                    const obj = JSON.parse(message);
-                    switch (obj.type) {
-                        case "balls":
-                            this.update_canvas_size(obj.resolution[0], obj.resolution[1]);
-                            //wrap balls up in simple object
-                            this.balls = obj.balls.map(b => {
-                                return {
-                                    id: parseInt(b[0]),
-                                    colour: b[1],
-                                    radius: parseFloat(b[2]),
-                                    x: parseInt(b[3]),
-                                    y: parseInt(b[4])
-                                };
-                            });
-                            break;
-                        case "frame":
-                            //console.log("image_received");
-                            let src = false;
-                            if (obj.image.format === "jpg") {
-                                src = 'data:image/jpg;base64,' + obj.image.data;
-                            }
-                            else if (obj.image.format === "png") {
-                                src = 'data:image/png;base64,' + obj.image.data;
-                            }
-                            if (src !== false) {
+                const obj = JSON.parse(message);
+                switch (obj.type) {
+                    case "welcome":
+                        this.update_show_ui();
+                        break;
+                    case "balls":
+                        this.update_canvas_size(obj.resolution[0], obj.resolution[1]);
+                        //wrap balls up in simple object
+                        this.balls = obj.balls.map(b => {
+                            return {
+                                id: parseInt(b[0]),
+                                colour: b[1],
+                                radius: parseFloat(b[2]),
+                                x: parseInt(b[3]),
+                                y: parseInt(b[4])
+                            };
+                        });
+                        break;
+                    case "frame":
+                        //console.log("image_received");
+                        let src = false;
+                        if (obj.image.format === "jpg") {
+                            src = 'data:image/jpg;base64,' + obj.image.data;
+                        }
+                        else if (obj.image.format === "png") {
+                            src = 'data:image/png;base64,' + obj.image.data;
+                        }
+                        if (src !== false) {
 
-                                this.img.src = src;
-                            }
-                            this.is_grabbing_frame = false;
-                            break;
-                        default:
-                            console.log('Unknown message type: ' + obj.type)
-                    }
-                    // should be in som performance timer?
-                    this.clear();
-                    this.draw_balls()
+                            this.img.src = src;
+                        }
+                        this.is_grabbing_frame = false;
+                        break;
+                    default:
+                        console.log('Unknown message type: ' + obj.type)
                 }
-            }
+                // should be in som performance timer?
+                this.canvas2d.clear();
+                this.draw_balls()
 
-            clear() {
-                this.ctx.fillStyle = "black";
-                //ctx.fillRect(0,0,300,150);
-                this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-            }
-
-            draw_disc(x, y, radius, colour) {
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
-                this.ctx.fillStyle = colour;
-                this.ctx.fill();
             }
 
             draw_balls() {
                 this.balls.forEach(ball => {
-                    this.draw_disc(ball.x, ball.y, ball.radius, ball.colour)
-
+                    this.canvas2d.disc(ball.x, ball.y, ball.radius, ball.colour)
                 });
-
-
-            }
-
-            close() {
-                if (this.is_connected()) {
-                    this.disconnected();
-                }
-            }
-
-            on_error(event) {
-                console.log('connection error: ' + event.type);
-                this.do_auto_reconnect();
-            }
-
-            is_connected() {
-                if (this.websocket !== null) {
-                    return (this.websocket.readyState === this.websocket.OPEN);
-                }
-            }
-
-            disconnected() {
-                this.disconnect_handlers();
-                this.websocket.close();
-                this.websocket = null;
-            }
-
-            do_auto_reconnect() {
-                this.disconnected();
-
-
-                if (this.auto_reconnect) {
-                    console.log('will attempt reconnect in 1 second');
-                    this.auto_reconnect_interval_id = setInterval(() => this.connect(), 1000)
-                }
             }
 
             toggle_ui() {
                 this.show_ui = !this.show_ui;
                 this.update_show_ui();
-
             }
 
             update_show_ui() {
-                this.send("show_ui", {"value": this.show_ui});
+                this.send_message("show_ui", {"value": this.show_ui});
             }
 
             stabilize() {
-                this.send("stabilize", {"frames": 30});
+                this.send_message("stabilize", {"frames": 30});
             }
 
             update_prop(path, value) {
-                this.send('prop', {'path': path, 'value': value});
+                this.send_message('prop', {'path': path, 'value': value});
             }
 
+            send_message(type, message) {
+                message.type = type;
+                this.send_json(message);
+            }
 
 
         }
@@ -254,8 +300,12 @@
     <input type="text" value="127.0.0.1" id="ip1">
     <button onclick="connect(1)">Connect</button>
     <button onclick="stabilize(1)">Stabilize</button>
-    <div>Blur:<div id="1:tracker/blur"></div></div>
-    <div>Quality:<div id="1:frame/quality"></div></div>
+    <div>Blur:
+        <div id="1:tracker/blur"></div>
+    </div>
+    <div>Quality:
+        <div id="1:frame/quality"></div>
+    </div>
 </div>
 <div>
     <div>
@@ -266,15 +316,18 @@
     <input type="text" value="172.30.68.142" id="ip2">
     <button onclick="connect(2)">Connect</button>
     <button onclick="stabilize(2)">Stabilize</button>
-    <div>Quality:<div id="2:frame/quality"></div></div>
+    <div>Quality:
+        <div id="2:frame/quality"></div>
+    </div>
 </div>
 <script src="nouislider.min.js"></script>
 <script>
     //ws://
     let soc1 = null;
     let soc2 = null;
+
     function connect(index) {
-        let ip = document.getElementById('ip'+index);
+        let ip = document.getElementById('ip' + index);
         let soc = soc1;
         if (index === 2) {
             soc = soc2;
@@ -282,23 +335,25 @@
         if (soc !== null) {
             soc.close();
         }
-        soc = new SoundOfColourServer("ws://" + ip.value + ":8001", 'frame'+index, 'test'+index);
-        soc.connect();
+        soc = new SoundOfColourServer("ws://" + ip.value + ":8001", 'frame' + index, 'test' + index);
+        soc.start_connect();
         if (index === 1) {
             soc1 = soc;
         } else {
             soc2 = soc;
         }
     }
+
     function stabilize(index) {
         let soc = soc1;
         if (index === 2) {
             soc = soc2;
         }
         soc.stabilize();
-     }
-     let slider = document.getElementById("1:tracker/blur");
-     noUiSlider.create(slider, {
+    }
+
+    let slider = document.getElementById("1:tracker/blur");
+    noUiSlider.create(slider, {
         start: [0],
         connect: true,
         step: 1,
@@ -307,7 +362,7 @@
             'max': 100
         }
     });
-    slider.noUiSlider.on('update', function( values, handle ) {
+    slider.noUiSlider.on('update', function (values, handle) {
         //inputFormat.value = values[handle];
         if (soc1 !== null) {
             soc1.update_prop('tracker/blur', parseInt(values[handle]));
@@ -325,7 +380,7 @@
             'max': 100
         }
     });
-    slider2.noUiSlider.on('update', function( values, handle ) {
+    slider2.noUiSlider.on('update', function (values, handle) {
         //inputFormat.value = values[handle];
         if (soc1 !== null) {
             soc1.quality(values[handle]);
@@ -343,7 +398,7 @@
             'max': 100
         }
     });
-    slider3.noUiSlider.on('update', function( values, handle ) {
+    slider3.noUiSlider.on('update', function (values, handle) {
         //inputFormat.value = values[handle];
         if (soc2 !== null) {
             soc2.quality(values[handle]);
