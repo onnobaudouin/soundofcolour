@@ -4,21 +4,28 @@
     <meta charset="UTF-8">
     <title>Sound Of Colour</title>
     <link href="nouislider.min.css" rel="stylesheet">
+    <script src="nouislider.min.js"></script>
     <script language="javascript" type="text/javascript">
         class SocketClient {
-            constructor(url) {
+            constructor(url = null) {
                 this.url = url;  //e.g. "ws://localhost:8001/"
                 this.websocket = null;
                 this.auto_reconnect = true;
                 this.auto_reconnect_interval_id = null;
-                this.openHandler = evt => this.on_open(evt);
+                this.openHandler = evt => this.on_open_private(evt);
                 this.closeHandler = evt => this.on_close_private(evt);
                 this.messageHandler = evt => this.on_message(evt);
                 this.errorHandler = evt => this.on_error_private(evt);
             }
 
-            on_open(event) {
+            on_open_private(event) {
                 console.log('connection open');
+                this.on_open(event);
+
+            }
+
+            on_open(event) {
+
             }
 
             on_close_private(close_event) {
@@ -52,6 +59,7 @@
 
             disconnected() {
                 this.disconnect_handlers();
+                console.log("closing...");
                 this.websocket.close();
                 this.websocket = null;
             }
@@ -100,6 +108,9 @@
             }
 
             start_connect() {
+                if (this.is_connected()) {
+                    this.close();
+                }
                 console.log("Connecting...");
                 this.stop_auto_reconnect();
                 try {
@@ -143,6 +154,11 @@
                 this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
             }
 
+            image(image) {
+                if (!this.ready()) return; //todo implement as empty functions?
+                this.ctx.drawImage(image,0,0);
+            }
+
             disc(x, y, radius, colour) {
                 if (!this.ready()) return; //todo implement as empty functions?
                 this.ctx.beginPath();
@@ -165,13 +181,15 @@
 
     <script language="javascript" type="text/javascript">
         class SoundOfColourServer extends SocketClient {
-            constructor(url, canvasID, imageID) {
-                super(url);
+
+            constructor() {
+                super();
+                this.id = "soc_" + SoundOfColourServer.id_gen++;
                 this.balls = [];
                 this.resolution = {width: 0, height: 0};
                 /*@var Canvas2D */
-                this.canvas2d = new Canvas2D(canvasID);
-                this.img = document.getElementById(imageID);
+                this.canvas2d = null;
+                this.img = null;
                 this.show_ui = false;
                 this.frame_quality = 30;
                 this.frame_grabber_id = null;
@@ -183,6 +201,32 @@
                     frame: this.on_message_frame
                 }
             }
+
+            connect_ui(parent_element) {
+                this.setup_dom(parent_element);
+                this.canvas2d = new Canvas2D(this.id_extra('canvas'));
+                this.img = document.getElementById(this.id_extra('img'));
+
+                this.connect_button = document.getElementById(this.id_extra('connect'));
+                this.connect_button.addEventListener('click', () => {
+                    let ip = document.getElementById(this.id_extra('ip')).value;
+                    this.url = "ws://" + ip + ":8001";
+                    this.start_connect();
+                });
+                this.stabilize_button = document.getElementById(this.id_extra('stabilize'));
+                this.stabilize_button.addEventListener('click', () => {
+                    this.stabilize();
+                });
+                this.toggle_ui_button = document.getElementById(this.id_extra('toggle_ui'));
+                this.toggle_ui_button.addEventListener('click', () => {
+                    this.toggle_ui();
+                });
+
+                this.connect_prop_slider('tracker/blur');
+                this.connect_prop_slider('frame/quality');
+
+            }
+
 
             on_open(event) {
                 this.frame_grabber_id = setInterval(() => this.maybe_request_frame(), 20);
@@ -261,11 +305,12 @@
                         this.message_handlers[message.type].apply(this, [message]);
                     }
                 } else {
-                    console.log('unknown message :'+message_raw);
+                    console.log('unknown message :' + message_raw);
                 }
             }
 
             draw_balls() {
+                this.canvas2d.image(this.img);
                 this.balls.forEach(ball => {
                     this.canvas2d.disc(ball.x, ball.y, ball.radius, ball.colour)
                 });
@@ -293,131 +338,75 @@
                 this.send_json(message);
             }
 
+            id_extra(extra) {
+                return (this.id + extra)
+            }
+
+            id_as_html(extra = '') {
+                return ' id="' + this.id_extra(extra) + '" ';
+            }
+
+            setup_dom(parent_element) {
+                //  this.parent_element = document.getElementById(parent_id);
+                this.element = document.createElement("div");
+                this.element.id = this.id_extra('');
+                const html = '<div>' +
+                    '<canvas ' + this.id_as_html('canvas') + '></canvas>' +
+                    '<img ' + this.id_as_html('img') + '>' +
+                    '</div>' +
+                    '<div>' +
+                    '<button ' + this.id_as_html('toggle_ui') + '>Toggle UI</button>' +
+                    '<input type="text" value="127.0.0.1"' + this.id_as_html('ip') + '>' +
+                    '<button ' + this.id_as_html('connect') + '>Connect</button>' +
+                    '<button ' + this.id_as_html('stabilize') + '>Stabilize</button>' +
+                    '</div>';
+                this.element.innerHTML = html;
+                this.setup_prop_slider('Blur', 'tracker/blur', this.element);
+                this.setup_prop_slider('Quality', 'frame/quality', this.element);
+
+                parent_element.appendChild(this.element);
+            }
+
+            setup_prop_slider(label, prop_path, parent_element) {
+                let wrap =  document.createElement("div");
+                let html = '<div>'+label+'<div '+this.id_as_html(prop_path)+'></div></div>';
+                wrap.innerHTML = html;
+                parent_element.appendChild(wrap);
+
+            }
+
+            connect_prop_slider(prop_path) {
+                let id = this.id_extra(prop_path);
+                let slider = document.getElementById(id);
+                noUiSlider.create(slider, {
+                    start: [0],
+                    connect: true,
+                    step: 1,
+                    range: {
+                        'min': 0,
+                        'max': 100
+                    }
+                });
+                slider.noUiSlider.on('update', (values, handle) => {
+                    this.quality(values[handle]);
+                });
+            }
+
 
         }
 
+        SoundOfColourServer.id_gen = 0; //stupid ES6.0 doesn't easily support class variables
+    </script>
+    <script>
 
     </script>
 
 </head>
-<body>
-<div>
-    <div>
-        <canvas id="frame1"></canvas>
-        <img id="test1">
-    </div>
-    <button onclick="soc1.toggle_ui()">Toggle UI</button>
-    <input type="text" value="127.0.0.1" id="ip1">
-    <button onclick="connect(1)">Connect</button>
-    <button onclick="stabilize(1)">Stabilize</button>
-    <div>Blur:
-        <div id="1:tracker/blur"></div>
-    </div>
-    <div>Quality:
-        <div id="1:frame/quality"></div>
-    </div>
-</div>
-<div>
-    <div>
-        <canvas id="frame2"></canvas>
-        <img id="test2">
-    </div>
-    <button onclick="soc2.toggle_ui()">Toggle UI</button>
-    <input type="text" value="172.30.68.142" id="ip2">
-    <button onclick="connect(2)">Connect</button>
-    <button onclick="stabilize(2)">Stabilize</button>
-    <div>Quality:
-        <div id="2:frame/quality"></div>
-    </div>
-</div>
-<script src="nouislider.min.js"></script>
-<script>
-    //ws://
-    let soc1 = null;
-    let soc2 = null;
-
-    function connect(index) {
-        let ip = document.getElementById('ip' + index);
-        let soc = soc1;
-        if (index === 2) {
-            soc = soc2;
-        }
-        if (soc !== null) {
-            soc.close();
-        }
-        soc = new SoundOfColourServer("ws://" + ip.value + ":8001", 'frame' + index, 'test' + index);
-        soc.start_connect();
-        if (index === 1) {
-            soc1 = soc;
-        } else {
-            soc2 = soc;
-        }
-    }
-
-    function stabilize(index) {
-        let soc = soc1;
-        if (index === 2) {
-            soc = soc2;
-        }
-        soc.stabilize();
-    }
-
-    let slider = document.getElementById("1:tracker/blur");
-    noUiSlider.create(slider, {
-        start: [0],
-        connect: true,
-        step: 1,
-        range: {
-            'min': 0,
-            'max': 100
-        }
-    });
-    slider.noUiSlider.on('update', function (values, handle) {
-        //inputFormat.value = values[handle];
-        if (soc1 !== null) {
-            soc1.update_prop('tracker/blur', parseInt(values[handle]));
-        }
-    });
-
-
-    let slider2 = document.getElementById("1:frame/quality");
-    noUiSlider.create(slider2, {
-        start: [0],
-        connect: true,
-        step: 1,
-        range: {
-            'min': 0,
-            'max': 100
-        }
-    });
-    slider2.noUiSlider.on('update', function (values, handle) {
-        //inputFormat.value = values[handle];
-        if (soc1 !== null) {
-            soc1.quality(values[handle]);
-        }
-    });
-
-
-    let slider3 = document.getElementById("2:frame/quality");
-    noUiSlider.create(slider3, {
-        start: [0],
-        connect: true,
-        step: 1,
-        range: {
-            'min': 0,
-            'max': 100
-        }
-    });
-    slider3.noUiSlider.on('update', function (values, handle) {
-        //inputFormat.value = values[handle];
-        if (soc2 !== null) {
-            soc2.quality(values[handle]);
-        }
-    });
-
-
-</script>
-
+<body id="body">
 
 </body>
+<script>
+    const soc = new SoundOfColourServer();
+    soc.connect_ui(document.getElementById('body'));
+</script>
 </html>
