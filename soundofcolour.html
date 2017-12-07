@@ -258,7 +258,7 @@
                 const message = JSON.parse(message_raw);
                 if ("type" in message) {
                     if (message.type in this.message_handlers) {
-                        this.message_handlers[message.type](message_event);
+                        this.message_handlers[message.type].apply(this, [message]);
                     }
                 } else {
                     console.log('unknown message :'+message_raw);

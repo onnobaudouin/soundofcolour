@@ -1,6 +1,6 @@
 {
   "tracker": {
-    "blur": 4,
+    "blur": 3,
     "min_circle": 3,
     "max_circle": 39,
     "min_area": 13
