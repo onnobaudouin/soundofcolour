@@ -23,7 +23,8 @@ class SoundOfColour:
             frame=self.on_message_frame,
             stabilize=self.on_message_stabilize,
             prop=self.on_message_prop,
-            prop_description=self.on_message_prop_description
+            prop_description=self.on_message_prop_description,
+            prop_all=self.on_message_prop_all
         )
 
     def on_tracker_update(self):
@@ -69,7 +70,7 @@ class SoundOfColour:
 
     def create_json_message(self, _type, message_dict):
         message_dict["type"] = _type
-        return self.dict_to_json(message_dict);
+        return self.dict_to_json(message_dict)
 
     def send_to_all_clients(self, _type, message):
         self.socket_server.send_to_all(self.create_json_message(_type, message))
@@ -118,7 +119,18 @@ class SoundOfColour:
         description = collections.OrderedDict()
         for prop in used_props:
             description[prop.name] = prop.as_description()
-        self.send_to_client(socket, type, json.dumps(description))
+        self.send_to_client(socket, type, description)
+
+    def on_message_prop_all(self, message, socket, type):
+        which_prop = message['properties_name']
+        p = None
+        if which_prop == "coloured_ball_tracker":
+            p = self.tracker.properties
+        elif which_prop == "sound-of-colour":
+            p = self.properties
+        if p is not None:
+            self.send_to_client(socket, type, p.contents())
+
 
     def on_client_message(self, socket):
         if socket.data == "undefined":

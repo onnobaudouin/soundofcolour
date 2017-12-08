@@ -140,6 +140,7 @@ class Property(PropertyNode):
             self.min = (0, 0, 0)
             self.max = (180, 255, 255)
             self.names = ["hue", "saturation", "luminosity"]
+
         if self.default is None:
             if self.is_single_numeric():
                 self.default = 0

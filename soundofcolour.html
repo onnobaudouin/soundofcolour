@@ -124,6 +124,495 @@
             }
         }
     </script>
+    <script>
+        const PropNodeType = {
+            group: 0,
+            unsigned_int: 1,
+            int: 2,
+            unsigned_float: 3,
+            bool: 4,
+            rgb: 5,
+            hsv: 6,
+            string: 7,
+            float: 8
+        };
+
+        const PropTypeSingleNumeric = [
+            PropNodeType.unsigned_int,
+            PropNodeType.int,
+            PropNodeType.float,
+            PropNodeType.unsigned_float
+        ];
+
+        const PropTypeMultipleNumeric = [
+            PropNodeType.rgb,
+            PropNodeType.hsv,
+        ];
+
+        class PropNode {
+            constructor(name, type) {
+                this.name = name;
+                this.type = type;
+            }
+
+            contents() {
+                return null;
+            }
+
+            as_description() {
+                let description = new Map();
+                description.set("name", this.name);
+                description.set("type", this.key_from_value(PropNodeType, this.type));
+                return description;
+            }
+
+            key_from_value(object, value) {
+                // https://stackoverflow.com/questions/36448649/get-key-corresponding-to-value-in-js-object
+                return Object.keys(object).find(key => object[key] === value);
+            }
+
+            as_dict() {
+                let d = {};
+                d[this.name] = this.contents()
+            }
+
+
+        }
+
+        class Property extends PropNode {
+            constructor(name, type, _default = undefined, value = undefined) {
+                super(name, type);
+                this.default = _default;
+                this.min = undefined;
+                this.max = undefined;
+                this._value = undefined;
+                this.names = [];
+                this.dirty = false;
+
+                switch (type) {
+                    case PropNodeType.unsigned_int:
+                        this.min = 0;
+                        this.max = Number.MAX_SAFE_INTEGER;
+                        break;
+                    case PropNodeType.int:
+                        this.min = Number.MIN_SAFE_INTEGER;
+                        this.max = Number.MAX_SAFE_INTEGER;
+                        break;
+                    case PropNodeType.float:
+                        this.min = Number.NEGATIVE_INFINITY;
+                        this.max = Number.POSITIVE_INFINITY;
+                        break;
+                    case PropNodeType.unsigned_float:
+                        this.min = 0.0;
+                        this.max = Number.POSITIVE_INFINITY;
+                        break;
+                    case PropNodeType.bool:
+                        this.min = 0;
+                        this.max = 1;
+                        break;
+                    case PropNodeType.rgb:
+                        this.min = [0, 0, 0];
+                        this.max = [255, 255, 255];
+                        this.names = ["red", "green", "blue"];
+                        break;
+                    case PropNodeType.hsv:
+                        this.min = [0, 0, 0];
+                        this.max = [180, 255, 255];
+                        this.names = ["hue", "saturation", "luminosity"];
+                        break;
+                    default:
+                        console.log("Unknown PropType: type")
+                }
+                if (this.default === undefined) {
+                    if (this.is_single_numeric()) {
+                        this.default = 0;
+                    } else if (this.type === PropNodeType.bool) {
+                        this.default = false;
+                    } else if (this.is_multiple_numeric()) {
+                        this.default = [0, 0, 0]; //todo: convert to float if float.?
+                    }
+                }
+                if (value !== undefined) {
+                    this.set(value);
+                } else {
+                    this.set(this.default);
+                }
+
+            }
+
+            is_single_numeric() {
+                return PropTypeSingleNumeric.includes(this.type); //
+            }
+
+            is_multiple_numeric() {
+                return PropTypeMultipleNumeric.includes(this.type);
+            }
+
+            range(minimum = undefined, maximum = undefined) {
+                if (minimum !== undefined) {
+                    this.min = minimum;
+                }
+                if (maximum !== undefined) {
+                    this.max = maximum;
+                }
+                return [this.min, this.max];
+            }
+
+            static clip(val, mi, ma) {
+                if (val < mi) {
+                    return mi;
+                } else if (val > ma) {
+                    return ma;
+                }
+                return val;
+            }
+
+            set(value, index = undefined, from_run_time_change = false) {
+                let temp_value = this.value();
+                if (this.is_single_numeric()) {
+                    this._value = Property.clip(value, this.min, this.max);
+                }
+                else if (this.is_multiple_numeric()) {
+                    if ((index !== undefined) && (index < this.min.length)) {
+                        this._value[index] = Property.clip(value);
+                    } else if (value.length === this.min.length) {
+                        this._value = value.map((val, index) => {
+                            return Property.clip(val, this.min[index], this.max[index]);
+                        });
+                    }
+                }
+                else if (this.type === PropNodeType.bool) {
+                    if ((value === true) || (value === 1)) {
+                        this._value = true;
+                    } else if ((value === false) || (value === 0)) {
+                        this._value = false;
+                    } else {
+                        console.log("bool not set coz not valid bool value: " + this.name);
+                    }
+                }
+
+                let was_changed = false;
+                if (this.is_multiple_numeric()) {
+                    was_changed = !Property.are_numeric_arrays_the_same(temp_value, this._value);
+                } else {
+                    was_changed = (temp_value !== this._value)
+                }
+                if (from_run_time_change) {
+                    this.dirty = was_changed || this.dirty;
+                }
+                return was_changed;
+            }
+
+            value() {
+                return this._value;
+            }
+
+            static are_numeric_arrays_the_same(ar1, ar2) {
+                if ((ar1 === undefined) || (ar1 === undefined)) {
+                    return false;
+                }
+                if (ar1.length !== ar2.length) {
+                    return false;
+                }
+                for (let index = 0; index < ar1.length; index++) {
+                    if (ar1[index] !== ar2[index]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            as_description() {
+                let d = super.as_description();
+                d["min"] = this.min;
+                d["max"] = this.max;
+                d["default"] = this.default;
+                d["names"] = this.names;
+                return d;
+            }
+
+            clean() {
+                this.dirty = false;
+            }
+
+            is_dirty() {
+                return this.dirty;
+            }
+
+            from_contents(contents) {
+                this.set(contents)
+            }
+
+            contents() {
+                return this.value();
+            }
+
+
+        }
+
+        class Properties extends PropNode {
+            constructor(name) {
+                super(name, PropNodeType.group);
+                this.children = new Map();
+            }
+
+            child_nodes() {
+                return this.children; //does MAP support iterate?
+            }
+
+            add_group(name) {
+                return this.add(name, PropNodeType.group);
+            }
+
+            add(name, type, _default = undefined, minimum = undefined, maximum = undefined) {
+                let p = null;
+                if (type === PropNodeType.group) {
+                    p = new Properties(name)
+                } else {
+                    p = new Property(name, type, _default, minimum, maximum);
+                    p.range(minimum, maximum)
+                }
+                this.children.set(name, p);
+                return p;
+            }
+
+            contents() {
+                let d = new Map();
+                this.child_nodes().forEach(node => {
+                    d.set(node.name, node.contents());
+                });
+                return d;
+            }
+
+            contents_json() {
+                return value_to_json(this.contents());
+            }
+
+            from_contents(contents) {
+                this.child_nodes().forEach(node => {
+                    if (node.name in contents) { //Might need to be more robust. but should be POJO
+                        node.from_contents(contents[node.name]);
+                    }
+                })
+            }
+
+            from_contents_json(contents_json) {
+                let contents = JSON.parse(contents_json);
+                this.from_contents(contents);
+            }
+
+            from_dict(dict) {
+                this.from_contents(dict[this.name]);
+            }
+
+            save() {
+                console.log('not implementd');
+            }
+
+            load() {
+                console.log('not implementd');
+            }
+
+            is_dirty() {
+                const nodes = this.child_nodes().values();
+                for (let node of nodes) {
+                    if (node.is_dirty()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            clean() {
+                this.child_nodes().map(node => node.clean());
+            }
+
+            static node_path_list_of(node_path) {
+                if (typeof node_path === 'string') {
+                    return node_path.split('/');
+                }
+                return node_path;
+            }
+
+            node_at_path(node_path) {
+                const node_path_list = Properties.node_path_list_of(node_path);
+                let current_node = this;
+                for (let node_name of node_path_list) {
+                    current_node = current_node.named_node(node_name);
+                    if (current_node === null) {
+                        console.log("node not found: " + node_path_list.join('/'));
+                        return null;
+                    }
+                    if (current_node.type !== PropNodeType.group) {
+                        return current_node;
+                    }
+                }
+                return current_node;
+            }
+
+            named_node(name) {
+                if (this.children.has(name)) {
+                    return this.children.get(name);
+                }
+                return null;
+            }
+
+            property_at_path(node_path) {
+                const node = this.node_at_path(node_path);
+                if (node !== null) {
+                    if (node.type !== PropNodeType.group) {
+                        return node;
+                    } else {
+                        console.log('Node found, but not a property');
+                    }
+                }
+                return null;
+            }
+
+            group_at_path(node_path) {
+                const node = this.node_at_path(node_path);
+                if (node !== null) {
+                    if (node.type === PropNodeType.group) {
+                        return node;
+                    } else {
+                        console.log('Node found, but not a group');
+                    }
+                }
+                return null;
+            }
+
+            value_of(node_path) {
+                const node = this.property_at_path(node_path);
+                if (node !== null) {
+                    return node.value();
+                } else {
+                    console.log('node not found');
+                }
+            }
+
+            set_value_of(node_path, value, from_run_time = false) {
+                const node = this.property_at_path(node_path);
+                if (node !== null) {
+                    return node.set(value, undefined, from_run_time); //indexed issue
+                }
+            }
+
+            as_description() {
+                let d = super.as_description();
+                d.set('children', Array.from(this.child_nodes().values()).map(node => node.as_description()));
+                return d;
+            }
+
+            as_description_json() {
+                return value_to_json(this.as_description());
+            }
+
+            static create_from_description_object(description_obj) {
+                let type = PropNodeType[description_obj.type];
+                if (type === PropNodeType.group) {
+                    let p = new Properties(description_obj.name);
+                    description_obj.children.forEach(child => {
+                        p.children.set(child.name, Properties.create_from_description_object(child));
+                    });
+                    return p;
+                } else {
+                    let p = new Property(description_obj.name, type, description_obj.default);
+                    p.range(description_obj.min, description_obj.max);
+                    p.names = description_obj.names; //not sure (is this part of a type?)
+                    return p;
+                }
+            }
+
+
+        }
+
+
+    </script>
+    <script>
+        function object_to_map(object) {
+            let m = new Map();
+            for (let key in object) {
+                if (Object.prototype.hasOwnProperty.call(object, key)) {
+                    m.set(key, object[key]);
+                }
+            }
+            return m;
+        }
+
+
+        function value_to_json(value) {
+            if (value === null) {
+                return 'null';
+            }
+            if (value === undefined) {
+                return 'null';
+            }
+            //DEAL WITH +/- INF at your leisure - null instead..
+            //https://stackoverflow.com/questions/1423081/json-left-out-infinity-and-nan-json-status-in-ecmascript
+            const type = typeof value;
+            //handle as much by what exists
+            if (['string', 'boolean', 'number', 'function'].includes(type)) {
+                return JSON.stringify(value)
+            } else if (Object.prototype.toString.call(value) === '[object Object]') {
+                let parts = [];
+                for (let k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        parts.push(JSON.stringify(k) + ': ' + value_to_json(value[k]));
+                    }
+                }
+                return '{' + parts.join(',') + '}';
+            }
+            //https://github.com/DavidBruant/Map-Set.prototype.toJSON/issues/16
+            //stackoverflow.com/questions/43704904/how-to-stringify-objects-containing-es5-sets-and-maps
+            //But these DO NOT RESPECT THE ORDER of the keys, NOT POSSIBLE with JSON.stringify
+            //https://stackoverflow.com/questions/31190885/json-stringify-a-set
+            else if (value instanceof Map) {
+                let parts_in_order = [];
+                value.forEach((entry, key) => {
+                    if (typeof key === 'string') {
+                        parts_in_order.push(JSON.stringify(key) + ':' + value_to_json(entry));
+                    } else {
+                        console.log('Non String KEYS in MAP not directly supported');
+                    }
+                    //FOR OTHER KEY TYPES ADD CUSTOM... 'Key' encoding...
+                });
+                return '{' + parts_in_order.join(',') + '}';
+            }
+            else if (typeof value[Symbol.iterator] !== "undefined") {
+                //Other iterables like SET (also in ORDER)
+                let parts = [];
+                for (let entry of value) {
+                    parts.push(value_to_json(entry))
+                }
+                return '[' + parts.join(',') + ']';
+            } else {
+                return JSON.stringify(value)
+            }
+        }
+
+     /*   let m = new Map();
+        m.set('first', 'first_value');
+        m.set('second', 'second_value');
+        let m2 = new Map();
+        m2.set('nested', 'nested_value');
+        m.set('sub_map', m2);
+        let map_in_array = new Map();
+        map_in_array.set('key', 'value');
+        let set1 = new Set(["1",2,3.0,4]);
+
+        m2.set('array_here', [map_in_array, "Hello", true, 0.1, null, undefined, Number.POSITIVE_INFINITY, {"a": 4}]);
+        m2.set('a set: ', set1);
+        const test = {
+            "hello": "ok",
+            "map": m
+        };
+
+        console.log(value_to_json(test));*/
+
+
+    </script>
+
+
     <script language="javascript" type="text/javascript">
         class Canvas2D {
             constructor(dom_id = null) {
@@ -156,7 +645,7 @@
 
             image(image) {
                 if (!this.ready()) return; //todo implement as empty functions?
-                this.ctx.drawImage(image,0,0);
+                this.ctx.drawImage(image, 0, 0);
             }
 
             disc(x, y, radius, colour) {
@@ -175,7 +664,26 @@
                     this.canvas.height = height;
                 }
             }
+
+
         }
+    </script>
+    <script>
+        /*let props = new Properties('test');
+        let ui = props.add_group('ui');
+        ui.add("blur", PropNodeType.unsigned_int);
+        ui.add("min_circle", PropNodeType.unsigned_int);
+        let colours = ["blue", "green", "yellow", "orange", "pink"];
+        let col = props.add_group('colours');
+        colours.forEach(colour_name => {
+            let sub = col.add_group(colour_name);
+            sub.add('min_hsv', PropNodeType.hsv);
+            sub.add('max_hsv', PropNodeType.hsv);
+        });
+        console.log(props.contents());
+        console.log(props.contents_json());
+        console.log(props.as_description());
+        console.log(props.as_description_json());*/
 
     </script>
 
@@ -195,11 +703,7 @@
                 this.frame_grabber_id = null;
                 this.is_grabbing_frame = false;
 
-                this.message_handlers = {
-                    welcome: this.on_message_welcome,
-                    balls: this.on_message_balls,
-                    frame: this.on_message_frame
-                }
+
             }
 
             connect_ui(parent_element) {
@@ -260,8 +764,43 @@
             }
 
             on_message_welcome() {
-                this.update_show_ui();
+                // this.update_show_ui();
+                this.send_message('prop_description')
             }
+
+            on_message_prop_description(message) {
+                let p = object_to_map(message);
+                this.properties = [];
+                p.forEach((value, key) => {
+                    if (typeof value["type"] !== 'undefined') {
+                        this.properties.push(Properties.create_from_description_object(value));
+                    }
+                });
+                console.log(this.properties);
+
+                let t = this.properties[0];
+                this.coloured_ball_tracker_properties = t;
+
+                console.log(t.value_of('colours/blue/enabled'));
+                console.log(t.set_value_of('colours/blue/enabled', false));
+                console.log(t.value_of('colours/blue/enabled'));
+                let c = t.contents_json();
+                console.log(c);
+                console.log(t.set_value_of('colours/blue/enabled', true));
+                console.log(t.value_of('colours/blue/enabled'));
+
+                t.from_contents_json(c);
+                console.log(t.value_of('colours/blue/enabled'));
+
+                this.send_message('prop_all', {'properties_name': 'coloured_ball_tracker'});
+            }
+
+            on_message_prop_all(message) {
+                console.log(message);
+                this.coloured_ball_tracker_properties.from_contents(message);
+                console.log(  this.coloured_ball_tracker_properties.contents_json())
+            }
+
 
             on_message_balls(message) {
                 this.update_canvas_size(message.resolution[0], message.resolution[1]);
@@ -301,9 +840,11 @@
                 const message_raw = message_event.data;
                 const message = JSON.parse(message_raw);
                 if ("type" in message) {
-                    if (message.type in this.message_handlers) {
-                        this.message_handlers[message.type].apply(this, [message]);
+                    const method_name = "on_message_" + message.type;
+                    if (method_name in this) {
+                        this[method_name].apply(this, [message])
                     }
+
                 } else {
                     console.log('unknown message :' + message_raw);
                 }
@@ -333,7 +874,7 @@
                 this.send_message('prop', {'path': path, 'value': value});
             }
 
-            send_message(type, message) {
+            send_message(type, message = {}) {
                 message.type = type;
                 this.send_json(message);
             }
@@ -368,8 +909,8 @@
             }
 
             setup_prop_slider(label, prop_path, parent_element) {
-                let wrap =  document.createElement("div");
-                let html = '<div>'+label+'<div '+this.id_as_html(prop_path)+'></div></div>';
+                let wrap = document.createElement("div");
+                let html = '<div>' + label + '<div ' + this.id_as_html(prop_path) + '></div></div>';
                 wrap.innerHTML = html;
                 parent_element.appendChild(wrap);
 
