@@ -4,6 +4,9 @@ import json
 import cv2
 import base64
 from properties import *
+import traceback
+import logging
+
 
 class SoundOfColour:
     def __init__(self):
@@ -78,10 +81,10 @@ class SoundOfColour:
         print("client connected")
         self.send_to_client(socket, 'welcome', dict())
 
-    def on_message_show_ui(self, message, socket):
+    def on_message_show_ui(self, message, socket, type):
         self.show_ui = bool(message["value"])
 
-    def on_message_frame(self, message, socket):
+    def on_message_frame(self, message, socket, type):
         quality = 50
         if "quality" in message:
             quality = int(message["quality"])
@@ -100,26 +103,22 @@ class SoundOfColour:
                     format=format)
             ))
 
-    def on_message_stabilize(self, message, socket):
+    def on_message_stabilize(self, message, socket, type):
         self.tracker.state.start("stabilize")
 
-    def on_message_prop(self, message, socket):
+    def on_message_prop(self, message, socket, type):
         prop_path = message["path"]
         prop_value = message["value"]
         print("prop " + str(socket.data))
         self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
         self.tracker.properties_ui.update("tracker")
 
-    def as_description_json(self):
-        description = dict(
-            frame=dict()
-        )
-
-
-    def on_message_prop_description(self, message, socket):
-        tracker_prop = self.tracker.properties.as_description_json()
-
-
+    def on_message_prop_description(self, message, socket, type):
+        used_props = (self.tracker.properties, self.properties)
+        description = collections.OrderedDict()
+        for prop in used_props:
+            description[prop.name] = prop.as_description()
+        self.send_to_client(socket, type, json.dumps(description))
 
     def on_client_message(self, socket):
         if socket.data == "undefined":
@@ -127,12 +126,17 @@ class SoundOfColour:
         try:
             message = json.loads(socket.data)
         except json.JSONDecodeError:
+            print("error decoding json: " + socket.data)
             return
 
         type = message["type"]
         if type in self.message_handlers:
             fun = self.message_handlers[type]
-            fun(message, socket)
+            try:
+                fun(message, socket, type)
+            except Exception as e:
+                logging.error(traceback.format_exc())
+
         else:
             print("unknown message: " + str(socket.data))
 

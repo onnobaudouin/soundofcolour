@@ -1,4 +1,4 @@
-from hardware import *
+from hardware import Hardware
 from mouseinteraction import MouseInteraction
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
@@ -13,7 +13,7 @@ from stateengine import *
 
 
 class ColouredBallTracker(object):
-    IS_RUNNING_ON_PI = is_raspberry_pi()
+    IS_RUNNING_ON_PI = Hardware.is_raspberry_pi()
 
     def __init__(self):
         self.properties = self.create_properties()
