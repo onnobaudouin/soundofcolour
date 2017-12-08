@@ -85,24 +85,24 @@ class ColouredBallTracker(object):
         self.properties_ui.close()
 
     def create_properties(self) -> Properties:
-        props = Properties()
-        tracker = props.group("tracker")
-        tracker.add("blur", PropType.unsigned_int, maximum=250)
-        tracker.add("min_circle", PropType.unsigned_int, maximum=250)
-        tracker.add("max_circle", PropType.unsigned_int, maximum=250)
-        tracker.add("min_area", PropType.unsigned_int, maximum=1920)
+        props = Properties('coloured_ball_tracker')
+        tracker = props.add_group("tracker")
+        tracker.add("blur", PropNodeType.unsigned_int, maximum=250)
+        tracker.add("min_circle", PropNodeType.unsigned_int, maximum=250)
+        tracker.add("max_circle", PropNodeType.unsigned_int, maximum=250)
+        tracker.add("min_area", PropNodeType.unsigned_int, maximum=1920)
 
-        ui = props.group("ui")
-        ui.add("show_masks", PropType.bool)
+        ui = props.add_group("ui")
+        ui.add("show_masks", PropNodeType.bool)
 
-        colours2 = props.group("colours")
+        colours2 = props.add_group("colours")
         col = ["blue", "green", "yellow", "orange", "pink"]
         for name in col:
-            colour = colours2.group(name)
-            colour.add('enabled', PropType.bool, default=True)
-            colour.add('rgb', PropType.rgb)
-            colour.add('min_hsv', PropType.hsv)
-            colour.add('max_hsv', PropType.hsv)
+            colour = colours2.add_group(name)
+            colour.add('enabled', PropNodeType.bool, default=True)
+            colour.add('rgb', PropNodeType.rgb)
+            colour.add('min_hsv', PropNodeType.hsv)
+            colour.add('max_hsv', PropNodeType.hsv)
         return props
 
     def change_resolution(self, resolution):
@@ -189,8 +189,8 @@ class ColouredBallTracker(object):
         # todo: optimize with dirty versioning and return same as before
         # or dirty manual checking...
         tracked_colours = []
-        colours_node = self.properties.node_from_path('colours')
-        for (key, colour_node) in colours_node.groups.items():
+        colours_node = self.properties.node_at_path('colours')
+        for colour_node in colours_node.child_nodes():
             if colour_node.value_of('enabled') is True:
                 tracked_colour = TrackedColour(
                     name=colour_node.name,

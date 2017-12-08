@@ -3,7 +3,7 @@ from soundofcoloursocketserver import SoundOfColourSocketServer
 import json
 import cv2
 import base64
-
+from properties import *
 
 class SoundOfColour:
     def __init__(self):
@@ -13,11 +13,14 @@ class SoundOfColour:
         self.ball_count = None
         self.show_ui = False
 
+        self.properties = Properties('sound-of-colour')
+
         self.message_handlers = dict(
             show_ui=self.on_message_show_ui,
             frame=self.on_message_frame,
             stabilize=self.on_message_stabilize,
-            prop=self.on_message_prop
+            prop=self.on_message_prop,
+            prop_description=self.on_message_prop_description
         )
 
     def on_tracker_update(self):
@@ -53,7 +56,7 @@ class SoundOfColour:
         ball_info = []
         for ball in balls:
             ball_info.append([ball.id, ball.colour.name, int(ball.radius), int(ball.pos[0]), int(ball.pos[1])])
-        self.send_to_clients('balls', dict(
+        self.send_to_all_clients('balls', dict(
             balls=ball_info,
             resolution=list(self.tracker.resolution())
         ))
@@ -65,7 +68,7 @@ class SoundOfColour:
         message_dict["type"] = _type
         return self.dict_to_json(message_dict);
 
-    def send_to_clients(self, _type, message):
+    def send_to_all_clients(self, _type, message):
         self.socket_server.send_to_all(self.create_json_message(_type, message))
 
     def send_to_client(self, socket, _type, message):
@@ -106,6 +109,17 @@ class SoundOfColour:
         print("prop " + str(socket.data))
         self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
         self.tracker.properties_ui.update("tracker")
+
+    def as_description_json(self):
+        description = dict(
+            frame=dict()
+        )
+
+
+    def on_message_prop_description(self, message, socket):
+        tracker_prop = self.tracker.properties.as_description_json()
+
+
 
     def on_client_message(self, socket):
         if socket.data == "undefined":

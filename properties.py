@@ -1,11 +1,13 @@
 from enum import Enum
 import sys
 from jsonfile import JSONFile
-# from pprint import pprint
+from pprint import pprint
 import collections
+from typing import Optional, Union, Any, List, Dict
 
 
-class PropType(Enum):
+class PropNodeType(Enum):
+    group = 0
     unsigned_int = 1
     int = 2
     unsigned_float = 3
@@ -78,53 +80,70 @@ class PropType(Enum):
 #     @staticmethod
 #     def range():
 #         return (0, 0, 0), (180, 255, 255)
+class PropertyNode:
+    def __init__(self, name, type):
+        self.type = type
+        self.name = name
+
+    def as_description(self) -> collections.OrderedDict:
+        return collections.OrderedDict(
+            [("name", self.name),
+             ("type", PropNodeType(self.type).name.lower())
+             ])
+
+    def as_dict(self) -> Dict:
+        return {
+            self.name: self.contents()
+        }
+
+    def contents(self):
+        return None
 
 
-class Property:
-    numerics = [PropType.unsigned_int,
-                PropType.int,
-                PropType.float,
-                PropType.unsigned_float]
+class Property(PropertyNode):
+    numerics = [PropNodeType.unsigned_int,
+                PropNodeType.int,
+                PropNodeType.float,
+                PropNodeType.unsigned_float]
 
-    numeric_tuple = [PropType.rgb, PropType.hsv]
+    numeric_tuple = [PropNodeType.rgb, PropNodeType.hsv]
 
     def __init__(self, name, type, default=None, value=None):
-        self.type = type
+        super().__init__(name, type)
         self.default = default
         self.min = None
         self.max = None
         self._value = None
-        self.name = name
         self.names = []
         self.dirty = False
 
-        if self.type == PropType.unsigned_int:
+        if self.type == PropNodeType.unsigned_int:
             self.min = 0
             self.max = sys.maxsize
-        elif self.type == PropType.int:
+        elif self.type == PropNodeType.int:
             self.min = -sys.maxsize
             self.max = sys.maxsize
-        elif self.type == PropType.float:
+        elif self.type == PropNodeType.float:
             self.min = float("-inf")
             self.max = float("inf")
-        elif self.type == PropType.unsigned_float:
+        elif self.type == PropNodeType.unsigned_float:
             self.min = 0.0
             self.max = float("inf")
-        elif self.type == PropType.bool:
+        elif self.type == PropNodeType.bool:
             self.min = 0
             self.max = 1
-        elif self.type == PropType.rgb:
+        elif self.type == PropNodeType.rgb:
             self.min = (0, 0, 0)
             self.max = (255, 255, 255)
             self.names = ["red", "green", "blue"]
-        elif self.type == PropType.hsv:
+        elif self.type == PropNodeType.hsv:
             self.min = (0, 0, 0)
             self.max = (180, 255, 255)
             self.names = ["hue", "saturation", "luminosity"]
         if self.default is None:
             if self.is_single_numeric():
                 self.default = 0
-            if self.type == PropType.bool:
+            if self.type == PropNodeType.bool:
                 self.default = False
             if self.type in self.numeric_tuple:
                 self.default = (0, 0, 0)
@@ -133,6 +152,14 @@ class Property:
             self.set(value)
         else:
             self.set(self.default)
+
+    def as_description(self):
+        d = super().as_description()
+        d["min"] = self.min
+        d["max"] = self.max
+        d["default"] = self.default
+        d["names"] = self.names
+        return d
 
     def range(self, minimum=None, maximum=None):
         if minimum is not None:
@@ -153,7 +180,7 @@ class Property:
         return val
 
     # returns True if value was changed
-    def set(self, value, index=None, from_runtime_change=False):
+    def set(self, value, index=None, from_runtime_change: bool=False):
         temp_value = self.value()
         if self.is_single_numeric():
             self._value = self.clip(value, self.min, self.max)
@@ -169,7 +196,7 @@ class Property:
                     p.append(self.clip(v, mi, ma))
                 self._value = tuple(p)
 
-        if self.type == PropType.bool:
+        if self.type == PropNodeType.bool:
             if value == 0 or value is False:
                 self._value = False
             elif value == 1 or value is True:
@@ -186,166 +213,218 @@ class Property:
     def value(self):
         return self._value
 
-    def from_dict(self, dictionary):
-        if (self.is_single_numeric() or
-                (self.type == PropType.bool) or
-                (self.type == PropType.string)):
-            self.set(dictionary[self.name])
-        elif self.type in Property.numeric_tuple:
-            self.set(tuple(dictionary[self.name]))
+    def clean(self):
+        self.dirty = False
 
-    def as_dict(self):
-        if (self.is_single_numeric() or
-                (self.type == PropType.bool) or
-                (self.type == PropType.string)):
-            return {
-                self.name: self.value()
-            }
-        elif self.type in Property.numeric_tuple:
-            return {
-                self.name: list(self.value())
-            }
+    def is_dirty(self):
+        return self.dirty
 
+    def from_contents(self, contents):
+        if (self.is_single_numeric() or
+                (self.type == PropNodeType.bool) or
+                (self.type == PropNodeType.string)):
+            self.set(contents)
+        elif self.type in Property.numeric_tuple:
+            self.set(tuple(contents))
+
+    def contents(self):
+        if (self.is_single_numeric() or
+                (self.type == PropNodeType.bool) or
+                (self.type == PropNodeType.string)):
+            return self.value()
+        elif self.type in Property.numeric_tuple:
+            return list(self.value())
         pass
 
 
-class Properties:
-    def __init__(self, name=None, window_name=None):
-        self.props = collections.OrderedDict()
-        self.groups = collections.OrderedDict()
-        self.name = name
+class Properties(PropertyNode):
+    def __init__(self, name: str, window_name=None):
+        super().__init__(name, PropNodeType.group)
+        self.children = collections.OrderedDict()  # Ordered because adding is hierarchical
         self.path = None
         # self.dirty = False
-        if window_name is None:
-            self.window_name = self.name
+        self.window_name = self.name
 
-    def group(self, name):
-        p = Properties(name)
-        self.groups[name] = p
+    def child_nodes(self) -> List[Union[PropertyNode, Property, "Properties"]]:
+        return [x for key, x in self.children.items()]
+
+    def add_group(self, name: str) -> "Properties":
+        """Add a group node that will contain subnodes, but is itself contains no data
+
+        :param name:
+        :return: Property
+        """
+        return self.add(name, PropNodeType.group)
+
+    def add(self, name: str, prop_type: PropNodeType, default=None, minimum=None, maximum=None):
+        if prop_type is PropNodeType.group:
+            p = Properties(name)
+        else:
+            p = Property(name, prop_type, default, default)
+            p.range(minimum, maximum)
+
+        self.children[name] = p
         return p
 
-    def add(self, name, prop_type, default=None, minimum=None, maximum=None):
-        p = Property(name, prop_type, default, default)
-        p.range(minimum, maximum)
-        self.props[name] = p
+    def contents(self) -> collections.OrderedDict:
+        """Returns the contents, i.e. structure AND data of this node and subnodes.
+        It does NOT return a named-root. i.e. the calling nodes name is not included. use
+        from_dict() instead.
 
-    def as_dict(self):
+        :return: OrderedDict
+        """
         d = collections.OrderedDict()
-        for key, p in self.props.items():
-            d[p.name] = p.as_dict()[p.name]
-        for key, g in self.groups.items():
-            d[g.name] = g.as_dict()
+        for node in self.child_nodes():
+            d[node.name] = node.contents()
         return d
 
-    def from_dict(self, data):
-        for key, g in self.groups.items():
-            if g.name in data:
-                g.from_dict(data[g.name])
+    def from_contents(self, contents: collections.OrderedDict):
+        for node in self.child_nodes():
+            if node.name in contents:
+                node.from_contents(contents[node.name])
 
-        for key, p in self.props.items():
-            if p.name in data:
-                p.from_dict({p.name: data[p.name]})
+    def from_dict(self, dictionary: dict):
+        self.from_contents(dictionary[self.name])
 
     def save(self, path, file_type="json"):
         if file_type == "json":
-            d = self.as_dict()
+            d = self.contents()
             JSONFile.save(path, d)
         pass
 
-    def is_dirty(self):
-        for key, p in self.props.items():
-            if p.dirty:
-                return True
-        for key, g in self.groups.items():
-            if g.is_dirty():
+    def is_dirty(self) -> bool:
+        for node in self.child_nodes():
+            if node.is_dirty():
                 return True
         return False
 
     def clean(self):
-        for key, p in self.props.items():
-            p.dirty = False
-        for key, g in self.groups.items():
-            g.clean()
+        for node in self.child_nodes():
+            node.clean()
 
     def update_permanent_storage(self):
         if self.path is not None and self.is_dirty():
             self.save(self.path)
             self.clean()
 
-    def load(self, path, file_type="json"):
+    def load(self, path: str, file_type="json"):
         if file_type == "json":
             data = JSONFile.load(path)
             self.path = path
             if data is not None:
-                self.from_dict(data)
+                self.from_contents(data)
                 print("loaded: " + self.path)
             else:
-                self.from_dict(self.as_dict())
+                self.from_contents(self.contents())
                 print("loaded from defaults")
         pass
 
-    def set(self, name, value):
-        if name in self.props:
-            self.props[name].set(value)
-        else:
-            print("No Such property: " + name)
+    def node_path_list_of(self, node_path: Union[List[str], str]) -> List[str]:
+        """From varied input return a list of nodenames in order of hierarchy.
 
-    def node_path_of(self, node_path):
+        """
         if isinstance(node_path, str):
             return node_path.split('/')
         return node_path
 
-    def value_of(self, node_path):
-        node = self.node_from_path(node_path)
-        if node is not None:
-            return node.value()
-        else:
-            raise ValueError('Path does not result in a valid Node: ' + node_path)
-
-    def set_value_of(self, node_path, value, from_run_time=False):
-        node = self.node_from_path(node_path)
-        if node is not None:
-            return node.set(value=value, from_runtime_change=from_run_time)
-        else:
-            print("eeror")
-            raise ValueError('Set Value Of : Path does not result in a valid Node: ' + node_path)
-
-    def node_from_path(self, node_path):
-
-        node_path = self.node_path_of(node_path)
-        node = self
-        for node_name in node_path:
-            node = node.node(node_name)
-            if node is None:
+    def node_at_path(self, node_path: Union[List[str], str]) -> Optional[PropertyNode]:
+        node_path_list = self.node_path_list_of(node_path)
+        current_node = self
+        for node_name in node_path_list:
+            current_node = current_node.named_node(node_name)
+            if current_node is None:
+                print("Node not found: " + "/".join(node_path_list))
                 return None
+            if current_node.type != PropNodeType.group:  # actual data node (i.e. LEAF) so return as CANNOT continue.
+                return current_node
+            else:
+                pass  # i.e. go one deeper in hierarchy.
+        return current_node
+
+    def named_node(self, node_name: str) -> Optional[PropertyNode]:
+        if node_name in self.children:
+            return self.children[node_name]
+        return None
+
+    def property_at_path(self, node_path) -> Optional[Property]:
+        node = self.node_at_path(node_path)
+        if node is not None:
             if isinstance(node, Property):
                 return node
-                # node should be a properties so continue
-        return node
-
-    def node(self, node_name):
-        if node_name in self.props:
-            return self.props[node_name]
-        if node_name in self.groups:
-            return self.groups[node_name]
+            else:
+                print("Valid nodepath but a group node not a property")
         return None
+
+    def group_at_path(self, node_path) -> Optional["Properties"]:
+        # https://blog.jetbrains.com/pycharm/2015/11/python-3-5-type-hinting-in-pycharm-5/
+        node = self.node_at_path(node_path)
+        if node is not None:
+            if isinstance(node, Properties):
+                return node
+            else:
+                print("Valid nodepath but a property not a group")
+        return None
+
+    def value_of(self, node_path: Union[List[str], str]) -> Any:
+        node = self.property_at_path(node_path)
+        if node is not None:
+            return node.value()
+
+    def set_value_of(self, node_path: Union[List[str], str], value: Any, from_run_time: bool = False) -> Any:
+        node = self.property_at_path(node_path)
+        if node is not None:
+            return node.set(value=value, from_runtime_change=from_run_time)
+
+    def as_description(self) -> collections.OrderedDict:
+        """Returns a complete description of all propeties and hierarchy but NO DATA.
+
+        :return:
+        """
+        prop_descriptions = [p.as_description() for key, p in self.children.items()]
+        d = super().as_description()
+        d["children"] = prop_descriptions
+        return d
 
 
 if __name__ == "__main__":
-    props = Properties()
-    ui = props.group("ui")
-    ui.add("blur", PropType.unsigned_int, maximum=250)
-    ui.add("min_circle", PropType.unsigned_int, maximum=250)
-    ui.add("max_circle", PropType.unsigned_int, maximum=250)
-    ui.add("show_masks", PropType.bool)
-    ui.add("min_area", PropType.unsigned_int)
-    colours = props.group("colours")
+    props = Properties('test')
+    ui = props.add_group("ui")
+    ui.add("blur", PropNodeType.unsigned_int, maximum=250)
+    ui.add("min_circle", PropNodeType.unsigned_int, maximum=250)
+    ui.add("max_circle", PropNodeType.unsigned_int, maximum=250, default=10)
+    ui.add("show_masks", PropNodeType.bool, default=True)
+    ui.add("min_area", PropNodeType.unsigned_int)
+    colours = props.add_group("colours")
     col = ["blue", "green", "yellow", "orange", "pink"]
     for name in col:
-        colour = colours.group(name)
-        colour.add('min_hsv', PropType.hsv)
-        colour.add('max_hsv', PropType.hsv)
-    # pprint(props.as_dict())
-    props.load('test.json')
-    # pprint(props.as_dict())
+        colour = colours.add_group(name)
+        colour.add('min_hsv', PropNodeType.hsv)
+        colour.add('max_hsv', PropNodeType.hsv)
+    import json
+
+    contents = props.contents()
+    pprint(contents)
+    json_contents = json.dumps(contents, indent=2)
+    print(json_contents)
+
+    unjson_contents = json.loads(json_contents)
+    props.from_contents(unjson_contents)
+    pprint(contents)
     props.save('test.json')
+    props.load('test.json')
+    pprint(contents)
+
+    pprint(props.value_of("ui/max_circle"))
+    props.set_value_of('ui/max_circle', 50)
+    pprint(props.value_of("ui/max_circle"))
+    props.set_value_of('ui/max_circle', 450)
+    pprint(props.value_of("ui/max_circle"))
+
+    # print(json.dumps(props.as_dict(), indent=2))
+
+    # pprint(props.as_description())
+    # import json
+    # print(json.dumps(props.as_description(), indent=2))
+    # props.load('test.json')
+    # pprint(props.as_dict())
+    # props.save('test.json')

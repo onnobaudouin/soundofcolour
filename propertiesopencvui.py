@@ -26,34 +26,32 @@ class PropertiesOpenCVUI:
 
     def show(self, node_path):
         self.state = "LOADING"
-        node = self.properties.node_from_path(node_path)
+        node = self.properties.node_at_path(node_path)
         if isinstance(node, Properties):
-            props = node.props
+            # props = node.children
             window_name = node_path
             cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # todo: better name in json?
-            for prop_key in props:
-                prop = props[prop_key]
-                if prop.type in [PropType.hsv, PropType.rgb]:
+            for prop in node.child_nodes():
+                # prop = props[prop_key]
+                if prop.type in [PropNodeType.hsv, PropNodeType.rgb]:
                     for i in range(0, len(prop.min)):
                         self.create_bar(prop.name + '_' + prop.names[i],
                                         window_name, prop.min[i], prop.max[i],
                                         lambda x, p=prop, index=i: self.bar_call_back(p, x, index))
-                elif prop.type == PropType.unsigned_int:
+                elif prop.type == PropNodeType.unsigned_int:
                     self.create_bar(prop.name, window_name, prop.min, prop.max,
                                     lambda x, p=prop: self.bar_call_back(p, x))
-                elif prop.type == PropType.bool:
+                elif prop.type == PropNodeType.bool:
                     self.create_bar(prop.name, window_name, 0, 1, lambda x, p=prop: self.bar_call_back(p, x))
         self.update(node_path)
         self.state = None
 
     def update(self, node_path):
-        node = self.properties.node_from_path(node_path)
+        node = self.properties.node_at_path(node_path)
         if isinstance(node, Properties):
-            props = node.props
             window_name = node_path
-            for prop_key in props:
-                prop = props[prop_key]
-                if prop.type in [PropType.hsv, PropType.rgb]:
+            for prop in node.child_nodes():
+                if prop.type in [PropNodeType.hsv, PropNodeType.rgb]:
                     for i in range(0, len(prop.min)):
                         self.set_bar_pos(prop.name + '_' + prop.names[i], window_name, prop.value()[i])
                 else:
