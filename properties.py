@@ -64,7 +64,7 @@ class PropertyNode:
             else:
                 seek = seek.parent
 
-    def on_changed(self, prop, is_dirty=False):
+    def on_changed(self, prop, is_dirty=False, from_runtime_change=True):
         pass
 
 
@@ -178,7 +178,7 @@ class Property(PropertyNode):
             self.dirty = was_changed or self.dirty
 
         if was_changed:
-            self.root().on_changed(self, self.dirty)
+            self.root().on_changed(self, self.dirty, from_runtime_change)
 
         return was_changed
 
@@ -212,7 +212,7 @@ class Property(PropertyNode):
 class PropertiesListener(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def on_prop_updated(self, prop: PropertyNode):
+    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
         pass
 
 
@@ -379,14 +379,14 @@ class Properties(PropertyNode):
     def as_description_json(self):
         return json.dumps(self.as_description(), indent=2)
 
-    def on_changed(self, prop, is_dirty=False):
+    def on_changed(self, prop, is_dirty=False, from_runtime_change=True):
         # print("changed "+prop.name)
         if is_dirty and self.auto_file_save is True:
             self.update_permanent_storage()  # todo don't auto save like, this but periodically check to reduce writes
         if self.on_changed_handler is not None:
-            self.fire(self.on_changed_handler, prop)
+            self.fire(self.on_changed_handler, prop, from_runtime_change)
         for listener in self.on_changed_listeners:
-            listener.on_prop_updated(prop)
+            listener.on_prop_updated(prop, from_runtime_change)
 
     def fire(self, handler, *args):
         handler(*args)
@@ -394,7 +394,7 @@ class Properties(PropertyNode):
 
 if __name__ == "__main__":
     props = Properties('test')
-    props.on_changed_handler = lambda prop: print("changed: "+prop.name+' to: '+str(prop.value()))
+    props.on_changed_handler = lambda prop, x: print("changed: "+prop.name+' to: '+str(prop.value()))
 
     ui = props.add_group("ui")
     ui.add("blur", PropNodeType.unsigned_int, maximum=250)

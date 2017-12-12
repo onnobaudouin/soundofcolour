@@ -8,7 +8,7 @@ import traceback
 import logging
 
 
-class SoundOfColour:
+class SoundOfColour(PropertiesListener):
     def __init__(self):
         self.tracker = ColouredBallTracker()
         self.tracker.set_update_handler(lambda x=self: x.on_tracker_update())
@@ -18,6 +18,8 @@ class SoundOfColour:
 
         self.properties = Properties('sound-of-colour')
 
+        self.tracker.properties.add_listener(self)
+
         self.message_handlers = dict(
             show_ui=self.on_message_show_ui,
             frame=self.on_message_frame,
@@ -26,6 +28,17 @@ class SoundOfColour:
             prop_description=self.on_message_prop_description,
             prop_all=self.on_message_prop_all
         )
+
+    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
+        if from_runtime_change is False:
+            print("Prop changed but was non-ui")
+            return
+        if prop.type != PropNodeType.group:
+            print("sending to clients: " + prop.path_as_str())
+            self.send_to_all_clients(_type='prop', message=dict(
+                path=prop.path_as_str(),
+                value=prop.contents()
+            ))
 
     def on_tracker_update(self):
         self.tracker.show_ui(self.show_ui)
@@ -111,8 +124,8 @@ class SoundOfColour:
         prop_path = message["path"]
         prop_value = message["value"]
         print("prop " + str(socket.data))
-        self.tracker.properties.set_value_of(prop_path, value=prop_value)
-        # self.tracker.properties_ui.update("tracker")
+        self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=False)
+
 
     def on_message_prop_description(self, message, socket, type):
         used_props = (self.tracker.properties, self.properties)
@@ -130,7 +143,6 @@ class SoundOfColour:
             p = self.properties
         if p is not None:
             self.send_to_client(socket, type, p.contents())
-
 
     def on_client_message(self, socket):
         if socket.data == "undefined":

@@ -145,8 +145,15 @@
                 console.log(message);
                 this.coloured_ball_tracker_properties.from_contents(message);
                 this.properties_ui.update(); //todo -> properties should warn a UI that it has changed...
-                this.properties_ui.onChanged = (prop_node) => {this.onPropChanged(prop_node);};
+                this.properties_ui.onChanged = (prop_node) => {this.onPropChanged(prop_node);}; // this is ALL WRONG...
                 //console.log(this.coloured_ball_tracker_properties.contents_json())
+            }
+
+            on_message_prop(message) {
+                console.log(message);
+                this.coloured_ball_tracker_properties.set_value_of(message.path, message.value);
+                this.properties_ui.update();
+
             }
 
             onPropChanged(prop_node) {

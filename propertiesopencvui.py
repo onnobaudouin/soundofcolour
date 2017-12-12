@@ -9,7 +9,7 @@ class PropertiesOpenCVUI(PropertiesListener):
         self.state = None
         self.properties_uis = dict()
 
-    def on_prop_updated(self, prop: PropertyNode):
+    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
         self.update_ui(prop.path_as_str())
 
     def nothing(self, x):
@@ -46,7 +46,12 @@ class PropertiesOpenCVUI(PropertiesListener):
         ))
 
     def set_bar_pos(self, prop_name, window_name, value):
-        cv2.setTrackbarPos(prop_name, window_name, value)
+        current_value = self.get_bar_pos(prop_name, window_name)
+        if current_value != value:
+            cv2.setTrackbarPos(prop_name, window_name, value)
+
+    def get_bar_pos(self, prop_name, window_name):
+        return cv2.getTrackbarPos(prop_name, window_name)
 
     def show(self, node_path: str):
         #
