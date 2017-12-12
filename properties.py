@@ -137,8 +137,8 @@ class Property(PropertyNode):
             self.max = (255, 255, 255)
             self.names = ["red", "green", "blue"]
         elif self.type == PropNodeType.hsv:
-            self.min = (0, 0, 0)
-            self.max = (180, 255, 255)
+            self.min = (0.0, 0.0, 0.0)
+            self.max = (360.0, 1.0, 1.0)
             self.names = ["hue", "saturation", "luminosity"]
 
         if self.default is None:

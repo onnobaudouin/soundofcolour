@@ -194,24 +194,36 @@ class ColouredBallTracker(object):
             if colour_node.value_of('enabled') is True:
                 tracked_colour = TrackedColour(
                     name=colour_node.name,
-                    minimum_hsv=np.array(colour_node.value_of('min_hsv')),
-                    maximum_hsv=np.array(colour_node.value_of('max_hsv')),
+                    minimum_hsv=self.hsv_to_np_array(colour_node.value_of('min_hsv')),
+                    maximum_hsv=self.hsv_to_np_array(colour_node.value_of('max_hsv')),
                     rgb=colour_node.value_of('rgb')
                 )
                 tracked_colours.append(tracked_colour)
         return tracked_colours
 
+    def hsv_to_np_array(self, hsv):
+        """
+        Convert a normal Properties HSV (360.0, 0.0->1.0, 0.0->1.0) to a openCV one (0-180,0->255,0->255)
+        :param hsv:
+        :return:
+        """
+        hsv_tuple = (int(hsv[0] / 2.0), int(hsv[1] * 255.0), int(hsv[1] * 255.0))
+        return np.array(hsv_tuple)
+
+
     def process_frame(self, frame):
         active_colours = self.colours_to_track()
 
+        props = self.properties
+
         # pre blur to smooth image
-        blur = self.properties.value_of('tracker/blur')
+        blur = props.value_of('tracker/blur')
         if blur > 0:
             frame = self.blur(frame, blur)
 
-        min_enclosing = self.properties.value_of('tracker/min_circle')
-        max_enclosing = self.properties.value_of('tracker/max_circle')
-        min_area = self.properties.value_of('tracker/min_area')
+        min_enclosing = props.value_of('tracker/min_circle')
+        max_enclosing = props.value_of('tracker/max_circle')
+        min_area = props.value_of('tracker/min_area')
 
         balls_in_frame, active_colours = self.coloured_balls_in(
             bgr_frame=frame,
@@ -221,7 +233,7 @@ class ColouredBallTracker(object):
             min_area_in_pixels=min_area * min_area)
 
         if self.is_showing_ui:
-            show_masks = self.properties.value_of('ui/show_masks')
+            show_masks = props.value_of('ui/show_masks')
             if show_masks is True:
                 for colour in active_colours:
                     cv2.imshow('mask_' + colour.name, colour.mask)
