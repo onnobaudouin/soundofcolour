@@ -55,7 +55,7 @@ class DatGUIPropertiesView {
             case PropNodeType.float:
             case PropNodeType.int:
             case PropNodeType.bool:
-            case PropNodeType.rgb:
+            
             case PropNodeType.string:
             {
                 if(prop_node.set(value, undefined, true)) {
@@ -69,7 +69,15 @@ class DatGUIPropertiesView {
                 if(prop_node.set([value.h / 2, value.s, value.v], undefined, true)) { //2 because opencv - maybe change this as H does mean 360?
                     this.notify(prop_node);
                 }
-            }
+            } break;
+            case PropNodeType.rgb:
+            {
+               // console.log('rgb: '+value);
+                if(prop_node.set(value.map(x=> Math.round(x)) , undefined, true)) {
+                    //todo - properties should notify!
+                    this.notify(prop_node);
+                }
+            } break;
         }
     }
     
