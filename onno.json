@@ -1,55 +1,55 @@
 {
   "tracker": {
-    "blur": 0,
-    "min_circle": 3,
-    "max_circle": 39,
-    "min_area": 13
+    "blur": 176,
+    "min_circle": 7,
+    "max_circle": 125,
+    "min_area": 263
   },
   "ui": {
-    "show_masks": true
+    "show_masks": false
   },
   "colours": {
     "blue": {
-      "enabled": false,
+      "enabled": true,
       "rgb": [
         0,
         0,
         255
       ],
       "min_hsv": [
-        92.0,
-        1.0,
-        1.0
+        0,
+        0,
+        0
       ],
       "max_hsv": [
-        117.0,
-        1.0,
-        1.0
+        0,
+        0,
+        0
       ]
     },
     "green": {
       "enabled": true,
       "rgb": [
-        0,
-        152,
-        0
+        98,
+        215,
+        98
       ],
       "min_hsv": [
-        22.0,
-        1.0,
-        1.0
+        0,
+        0,
+        0
       ],
       "max_hsv": [
-        0.0,
-        1.0,
-        1.0
+        0,
+        0,
+        0
       ]
     },
     "yellow": {
       "enabled": true,
       "rgb": [
-        0,
-        0,
+        255,
+        255,
         0
       ],
       "min_hsv": [
@@ -66,14 +66,14 @@
     "orange": {
       "enabled": true,
       "rgb": [
-        0,
-        0,
-        0
+        85,
+        28,
+        28
       ],
       "min_hsv": [
+        180,
         0,
-        0,
-        0
+        1
       ],
       "max_hsv": [
         0,
@@ -84,19 +84,19 @@
     "pink": {
       "enabled": true,
       "rgb": [
-        255,
         0,
-        255
+        101,
+        61
       ],
       "min_hsv": [
-        360.0,
-        0.28627450980392155,
-        1.0
+        0,
+        0.4196078431372549,
+        0.29411764705882354
       ],
       "max_hsv": [
-        360.0,
-        1.0,
-        1.0
+        91.0,
+        0.5254901960784314,
+        0.3686274509803922
       ]
     }
   }
