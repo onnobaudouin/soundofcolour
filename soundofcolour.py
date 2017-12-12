@@ -111,8 +111,8 @@ class SoundOfColour:
         prop_path = message["path"]
         prop_value = message["value"]
         print("prop " + str(socket.data))
-        self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
-        self.tracker.properties_ui.update("tracker")
+        self.tracker.properties.set_value_of(prop_path, value=prop_value)
+        # self.tracker.properties_ui.update("tracker")
 
     def on_message_prop_description(self, message, socket, type):
         used_props = (self.tracker.properties, self.properties)
