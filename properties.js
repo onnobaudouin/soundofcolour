@@ -159,6 +159,7 @@ class Property extends PropNode {
     }
     
     set(value, index = undefined, from_run_time_change = false) {
+        // TODO: check TYPES
         let temp_value = this.value();
         if (this.is_single_numeric()) {
             this._value = Property.clip(value, this.min, this.max);

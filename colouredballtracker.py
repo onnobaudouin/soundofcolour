@@ -210,7 +210,6 @@ class ColouredBallTracker(object):
         hsv_tuple = (int(hsv[0] / 2.0), int(hsv[1] * 255.0), int(hsv[1] * 255.0))
         return np.array(hsv_tuple)
 
-
     def process_frame(self, frame):
         active_colours = self.colours_to_track()
 
@@ -264,9 +263,6 @@ class ColouredBallTracker(object):
         (r, g, b) = rgb
         return (b, g, r)
 
-
-
-
     def update(self):
         vs = self.video_stream
         new_frame, last_valid_frame, frame_count, resolution = vs.latest()
@@ -295,8 +291,6 @@ class ColouredBallTracker(object):
 
             self.last_frame = cvh.clone_image(self.frame)
 
-
-
     def start(self):
         self.thread = Thread(target=self.run, args=())
         self.thread.daemon = True
@@ -319,10 +313,11 @@ class ColouredBallTracker(object):
             return
         self.is_showing_ui = bool(state)
         if self.is_showing_ui:
+            print("showing UI")
             self.show_properties()
             cv2.namedWindow(self.main_window_name)  # for mouse events
             self.mouse.attach_to_window(self.main_window_name)
-            print("showing UI")
+
         else:
             self.close_properties()
             print("not showing UI")
@@ -381,4 +376,3 @@ if __name__ == '__main__':
     col = ColouredBallTracker()
     col.show_ui(True)
     col.run()
-
