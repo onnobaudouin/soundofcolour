@@ -5,6 +5,7 @@ from pprint import pprint
 import collections
 from typing import Optional, Union, Any, List, Dict
 import json
+import abc
 
 class PropNodeType(Enum):
     group = 0
@@ -208,6 +209,13 @@ class Property(PropertyNode):
         pass
 
 
+class PropertiesListener(metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    def on_prop_updated(self, prop: PropertyNode):
+        pass
+
+
 class Properties(PropertyNode):
     def __init__(self, name: str, parent=None, window_name=None):
         super().__init__(name, PropNodeType.group, parent)
@@ -216,6 +224,7 @@ class Properties(PropertyNode):
         self.auto_file_save = True
         self.window_name = self.name
         self.on_changed_handler = None
+        self.on_changed_listeners = []
 
     def child_nodes(self) -> List[Union[PropertyNode, Property, "Properties"]]:
         return [x for key, x in self.children.items()]
@@ -237,6 +246,10 @@ class Properties(PropertyNode):
 
         self.children[name] = p
         return p
+
+    def add_listener(self, listener: PropertiesListener):
+        self.on_changed_listeners.append(listener)
+
 
     def contents(self) -> collections.OrderedDict:
         """Returns the contents, i.e. structure AND data of this node and subnodes.
@@ -372,6 +385,8 @@ class Properties(PropertyNode):
             self.update_permanent_storage()  # todo don't auto save like, this but periodically check to reduce writes
         if self.on_changed_handler is not None:
             self.fire(self.on_changed_handler, prop)
+        for listener in self.on_changed_listeners:
+            listener.on_prop_updated(prop)
 
     def fire(self, handler, *args):
         handler(*args)

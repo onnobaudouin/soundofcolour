@@ -2,14 +2,14 @@ from properties import *
 import cv2
 
 
-class PropertiesOpenCVUI:
+class PropertiesOpenCVUI(PropertiesListener):
     def __init__(self, properties_obj):
         self.properties = properties_obj
-        self.properties.on_changed_handler = lambda prop: self.on_prop_changed(prop)
+        self.properties.add_listener(self)
         self.state = None
         self.properties_uis = dict()
 
-    def on_prop_changed(self, prop: PropertyNode):
+    def on_prop_updated(self, prop: PropertyNode):
         self.update_ui(prop.path_as_str())
 
     def nothing(self, x):
