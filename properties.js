@@ -260,7 +260,7 @@ class Properties extends PropNode {
         if (type === PropNodeType.group) {
             p = new Properties(name, this)
         } else {
-            p = new Property(name, type, this, _default, minimum, maximum);
+            p = new Property(name, type, this, _default);
             p.range(minimum, maximum);
         }
         this.children.set(name, p);
