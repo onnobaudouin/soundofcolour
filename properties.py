@@ -7,6 +7,7 @@ from typing import Optional, Union, Any, List, Dict
 import json
 import abc
 
+
 class PropNodeType(Enum):
     group = 0
     unsigned_int = 1
@@ -22,7 +23,7 @@ class PropNodeType(Enum):
 class PropertyNode:
     PATH_SEPARATOR = '/'
 
-    def __init__(self, name, type, parent: "PropertyNode"=None):
+    def __init__(self, name, type, parent: "PropertyNode" = None):
         self.type = type
         self.name = name  # todo - validate self.name for invalid paths
         self.parent = parent
@@ -149,7 +150,8 @@ class Property(PropertyNode):
         return val
 
     # returns True if value was changed
-    def set(self, value, index=None, from_runtime_change: bool=True):
+    def set(self, value, index=None, from_runtime_change: bool = True):
+        # todo : get rid of this from_run_time crap... UI should not callback when set...
         temp_value = self.value()
         if self.is_single_numeric():
             self._value = self.clip(value, self.min, self.max)
@@ -163,6 +165,7 @@ class Property(PropertyNode):
                 # surely there is a more python way...
                 for v, mi, ma in zip(value, self.min, self.max):
                     p.append(self.clip(v, mi, ma))
+
                 self._value = tuple(p)
 
         if self.type == PropNodeType.bool:
@@ -174,8 +177,13 @@ class Property(PropertyNode):
                 self._value = self.default
 
         was_changed = temp_value != self.value()
+
+        if self.type == PropNodeType.rgb:
+            print("Prop Set RGB: from: "+str(temp_value)+ "->" + str(self.value()))
+
+
         if from_runtime_change:
-            self.dirty = was_changed or self.dirty
+            self.dirty = was_changed or self.dirty # todo: dirty should be OUTSIDE, but in a loader / saver.
 
         if was_changed:
             self.root().on_changed(self, self.dirty, from_runtime_change)
@@ -212,7 +220,7 @@ class Property(PropertyNode):
 class PropertiesListener(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
+    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool = True):
         pass
 
 
@@ -249,7 +257,6 @@ class Properties(PropertyNode):
 
     def add_listener(self, listener: PropertiesListener):
         self.on_changed_listeners.append(listener)
-
 
     def contents(self) -> collections.OrderedDict:
         """Returns the contents, i.e. structure AND data of this node and subnodes.
@@ -394,7 +401,7 @@ class Properties(PropertyNode):
 
 if __name__ == "__main__":
     props = Properties('test')
-    props.on_changed_handler = lambda prop, x: print("changed: "+prop.name+' to: '+str(prop.value()))
+    props.on_changed_handler = lambda prop, x: print("changed: " + prop.name + ' to: ' + str(prop.value()))
 
     ui = props.add_group("ui")
     ui.add("blur", PropNodeType.unsigned_int, maximum=250)
@@ -430,6 +437,3 @@ if __name__ == "__main__":
     print(props.value_of("ui/max_circle"))
 
     # print(json.dumps(props.as_dict(), indent=2))
-
-
-
