@@ -30,9 +30,9 @@ class SoundOfColour(PropertiesListener):
         )
 
     def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
-        if from_runtime_change is False:
-            print("Prop changed but was non-ui")
-            return
+        #if from_runtime_change is False:
+        #    print("Prop changed but was non-ui")
+        #    return
         if prop.type != PropNodeType.group:
             print("sending to clients: " + prop.path_as_str())
             self.send_to_all_clients(_type='prop', message=dict(
