@@ -23,6 +23,7 @@ const PropTypeMultipleNumeric = [
 ];
 
 class PropNode {
+   
     constructor(name, type, parent = null) {
         this.name = name;
         this.type = type;
@@ -65,6 +66,25 @@ class PropNode {
             }
         }
         return p.reverse();
+    }
+    
+    path_as_string() {
+        return this.path().join('/')
+    }
+    
+    root() {
+        let seek = this;
+        while (seek !== null) {
+            if (seek.parent === null) {
+                return seek;
+            } else {
+                seek = seek.parent
+            }
+        }
+    }
+    
+    on_changed(prop, is_dirty=false, from_runtime_change=true) {
+    
     }
     
     
@@ -158,7 +178,7 @@ class Property extends PropNode {
         return val;
     }
     
-    set(value, index = undefined, from_run_time_change = false) {
+    set(value, index = undefined, from_run_time_change = true) {
         // TODO: check TYPES
         let temp_value = this.value();
         if (this.is_single_numeric()) {
@@ -192,6 +212,10 @@ class Property extends PropNode {
         if (from_run_time_change) {
             this.dirty = was_changed || this.dirty;
         }
+        if (was_changed) {
+            this.root().on_changed(this, this.dirty, from_run_time_change)
+        }
+        
         return was_changed;
     }
     
@@ -232,7 +256,7 @@ class Property extends PropNode {
     }
     
     from_contents(contents) {
-        this.set(contents)
+        this.set(contents, undefined, false)
     }
     
     contents() {
@@ -413,6 +437,10 @@ class Properties extends PropNode {
             p.names = description_obj.names; //not sure (is this part of a type?)
             return p;
         }
+    }
+    
+    on_changed(prop, is_dirty=false, from_runtime_change=true) {
+    
     }
     
     
