@@ -12,6 +12,15 @@ class DatGUIPropertiesView {
         
     }
     
+    destroy() {
+        this.properties = null;
+        if (typeof this.gui !== "undefined") {
+            this.gui.destroy();
+        }
+        this.gui_obj = null;
+        this.onChanged = null;
+    }
+    
     attach_event_handler(prop_node, dat_object) {
         prop_node.dat_controller = dat_object;
         prop_node.dat_controller.onChange((value) => {this.onChange(prop_node, value)});
@@ -106,6 +115,13 @@ class DatGUIPropertiesView {
                 gui_obj[path] = prop_node.default;
                 this.attach_event_handler(prop_node, prop_attach.add(gui_obj, path).step(1).min(prop_node.min).max(prop_node.max));
                 
+                break;
+            }
+            case PropNodeType.unsigned_float:
+            case PropNodeType.float: {
+                gui_obj[path] = prop_node.default;
+                this.attach_event_handler(prop_node, prop_attach.add(gui_obj, path).min(prop_node.min).max(prop_node.max));
+        
                 break;
             }
             case PropNodeType.bool: {

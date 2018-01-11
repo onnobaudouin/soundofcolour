@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import opencvhelpers as cvh
+import imageprocessing as imageprocessing
 
 # mouse = []
 # 'EVENT_FLAG_ALTKEY',
@@ -68,11 +68,19 @@ class MouseInteraction:
                              lambda event, x, y, flags, param: self.handle_event(event, x, y, flags, param))
 
     def draw_on(self, frame, sampling_frame):
-        (mean, stddev) = cvh.mean_and_stddev_of_circle(sampling_frame, self.original_pos, self.radius)
-        hsv = cvh.bgr_to_hsv(mean[0], mean[1], mean[2])
+        if frame is None:
+            print("Warning, printing on framw with None, ignored")
+            return
+        if sampling_frame is None:
+            print("Warning, printing on sampling frame with None, ignored")
+            return
+
+        (mean, stddev) = imageprocessing.mean_and_stddev_of_circle(sampling_frame, self.original_pos, self.radius)
+        hsv = imageprocessing.bgr_to_hsv(mean[0], mean[1], mean[2])
+
         cv2.circle(frame, self.original_pos, self.radius, (255, 0, 0), 1)
-        cvh.draw_shadow_arrow(frame, self.original_pos, self.pos)
-        cvh.draw_disc(frame, self.original_pos, radius=5, colour=mean)
+        imageprocessing.draw_shadow_arrow(frame, self.original_pos, self.pos)
+        imageprocessing.draw_disc(frame, self.original_pos, radius=5, colour=mean)
         p = [int(x) for x in stddev]
-        cvh.draw_text(frame, str(hsv) + ' ' + str(p), self.pos)
+        imageprocessing.draw_text(frame, str(hsv) + ' ' + str(p), self.pos)
 

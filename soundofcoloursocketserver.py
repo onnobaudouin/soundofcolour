@@ -17,8 +17,10 @@ class SoundOfColourSocket(WebSocket):
         self.server.handle_connected(self)
 
     def handleClose(self):
-        self.server.clients.remove(self)
         print(self.address, 'closed')
+        self.server.clients.remove(self)
+        self.server.handle_closed(self)
+
         # for client in self.server.clients:
         #    client.sendMessage(self.address[0] + u' - disconnected')
 
@@ -28,6 +30,8 @@ class SoundOfColourSocketServer(SimpleWebSocketServer):
         self.clients = []
         self.client_connected_handler = None
         self.client_message_handler = None
+        self.client_closed_handler = None
+
 
         super().__init__(host, port, SoundOfColourSocket, 0.001)
         print("Socket Server Listening on port: " + str(port))
@@ -39,6 +43,9 @@ class SoundOfColourSocketServer(SimpleWebSocketServer):
     def set_on_client_connected(self, client_connected_handler):
         self.client_connected_handler = client_connected_handler
 
+    def set_on_client_closed(self, client_closed_handler):
+        self.client_closed_handler = client_closed_handler
+
     def set_on_client_message(self, client_message_handler):
         self.client_message_handler = client_message_handler
 
@@ -48,6 +55,9 @@ class SoundOfColourSocketServer(SimpleWebSocketServer):
 
     def handle_connected(self, socket):
         self.handle_socket_event(self.client_connected_handler, socket)
+
+    def handle_closed(self, socket):
+        self.handle_socket_event(self.client_closed_handler, socket)
 
     def handle_message(self, socket):
         self.handle_socket_event(self.client_message_handler, socket)

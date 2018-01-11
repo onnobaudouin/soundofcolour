@@ -2,10 +2,11 @@ from colouredballtracker import ColouredBallTracker
 from soundofcoloursocketserver import SoundOfColourSocketServer
 import json
 import cv2
-import base64
+import imageprocessing as imageprocessing
 from properties import *
 import traceback
 import logging
+from functools import reduce
 
 
 class SoundOfColour(PropertiesListener):
@@ -26,13 +27,22 @@ class SoundOfColour(PropertiesListener):
             stabilize=self.on_message_stabilize,
             prop=self.on_message_prop,
             prop_description=self.on_message_prop_description,
-            prop_all=self.on_message_prop_all
+            prop_all=self.on_message_prop_all,
+            mouse=self.on_message_mouse,
+            request_balls=self.on_message_request_balls,
+            sample=self.on_message_sample
         )
 
+        self.clients_requesting_balls = []
+        self.clients_requesting_frames = []  # todo
+
     def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool = True):
-        # if from_runtime_change is False:
-        #    print("Prop changed but was non-ui")
-        #    return
+        """
+        Callback from our properties
+        :param prop:
+        :param from_runtime_change:
+        :return:
+        """
         if prop.type != PropNodeType.group:
             print("sending to clients: " + prop.path_as_str())
             self.send_to_all_clients(_type='prop', message=dict(
@@ -41,39 +51,24 @@ class SoundOfColour(PropertiesListener):
             ))
 
     def on_tracker_update(self):
+        """
+        Called by tracker when it gets more information on balls
+        data is PUSHED, not polled.
+        :return:
+        """
         self.tracker.show_ui(self.show_ui)
         balls = self.tracker.balls()
-        self.send_balls_information_to_all_clients(balls)
+        self.send_balls_information_to_clients(balls)
 
-    def get_last_frame_as_base64_encoded_image(self, quality=20, format="jpg", ratio=1.0):
-        image = self.tracker.last_frame
-        if image is None:
-            return None
-        encode_as = ".jpg"
-        if format == "png":
-            encode_as = ".png"
-        if ratio != 1.0:
-            if ratio <= 0.01 or ratio > 1:
-                return None
-            new_size = (int(image.shape[1] * ratio), int(image.shape[0] * ratio))
-            image = cv2.resize(image, new_size,
-                               interpolation=cv2.INTER_LINEAR)  # INTER_CUBIC | INTER_LINEAR | INTER_AREA
-
-        if encode_as == ".jpg":
-            ret, buf = cv2.imencode(encode_as, image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-        else:
-            ret, buf = cv2.imencode(encode_as, image)
-
-        if ret is True:
-            return str(base64.b64encode(buf).decode())
-        else:
-            return None
-
-    def send_balls_information_to_all_clients(self, balls):
+    def send_balls_information_to_clients(self, balls):
+        if len(self.clients_requesting_balls) == 0:
+            return
         ball_info = []
         for ball in balls:
             ball_info.append([ball.id, ball.colour.name, int(ball.radius), int(ball.pos[0]), int(ball.pos[1])])
-        self.send_to_all_clients('balls', dict(
+
+        # only send to those that requested it!!!
+        self.send_to_clients(self.clients_requesting_balls, 'balls', dict(
             balls=ball_info,
             resolution=list(self.tracker.resolution())
         ))
@@ -88,6 +83,11 @@ class SoundOfColour(PropertiesListener):
     def send_to_all_clients(self, _type, message):
         self.socket_server.send_to_all(self.create_json_message(_type, message))
 
+    def send_to_clients(self, clients, _type, message):
+        message = self.create_json_message(_type, message)
+        for socket in clients:
+            socket.sendMessage(message)
+
     def send_to_client(self, socket, _type, message):
         socket.sendMessage(self.create_json_message(_type, message))
 
@@ -95,45 +95,145 @@ class SoundOfColour(PropertiesListener):
         print("client connected")
         self.send_to_client(socket, 'welcome', dict())
 
+    def on_client_closed(self, socket):
+        if socket in self.clients_requesting_balls:
+            self.clients_requesting_balls.remove(socket)
+
     def on_message_show_ui(self, message, socket, type):
+        """
+        Client triggers show_ui.
+        //this is not a property as yet...
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         self.show_ui = bool(message["value"])
 
+    def on_message_request_balls(self, message, socket, type):
+        self.clients_requesting_balls.append(socket)
+
+    def on_message_mouse(self, message, socket, type):
+        event = message['event']
+        x = float(message['x'])
+        y = float(message['y'])
+        if event == 'up':
+            cv2event = cv2.EVENT_RBUTTONUP
+        elif event == 'down':
+            cv2event = cv2.EVENT_RBUTTONDOWN
+        else:
+            cv2event = cv2.EVENT_MOUSEMOVE
+        width, height = self.tracker.resolution()
+
+        print("mouse " + event + " " + str(x) + " " + str(y))
+
+        self.tracker.mouse.handle_event(cv2event, int(width * x), int(height * y), None, None)
+
+    def on_message_sample(self, message, socket, type):
+        event = message['event']
+        if event == 'colour':
+            width, height = self.tracker.resolution()
+            x = int(width * float(message['x']))
+            y = int(height * float(message['y']))
+            radius = int(width * float(message['radius']))
+            hsv = self.tracker.sample_colour(x, y, radius)
+            # print(str(hsv))
+            return dict(hsv=hsv, event=event)
+        elif event == 'histogram':
+            width, height = self.tracker.resolution()
+            x = int(width * float(message['x']))
+            y = int(height * float(message['y']))
+            radius = int(width * float(message['radius']))
+            histogram = self.tracker.sample_histogram(x, y, radius)
+            # print(str(histogram))
+            pixel_count = reduce(lambda x, y: x + y, histogram[0])
+            return dict(histogram=histogram, event=event, pixel_count=pixel_count)
+        elif event == 'histogram_hsv':
+            width, height = self.tracker.resolution()
+            x = int(width * float(message['x']))
+            y = int(height * float(message['y']))
+            radius = int(width * float(message['radius']))
+            histogram_hsv = self.tracker.sample_histogram_hsv(x, y, radius)
+            # print(str(histogram))
+            pixel_count = reduce(lambda x, y: x + y, histogram_hsv[0])
+            return dict(histogram_hsv=histogram_hsv, event=event, pixel_count=pixel_count)
+
     def on_message_frame(self, message, socket, type):
+        """
+        Client requests last frame as base64 encoded image...
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         quality = 50
         if "quality" in message:
             quality = int(message["quality"])
         ratio = 1.0
         if "ratio" in message:
             ratio = float(message["ratio"])
-        format = "jpg"
+        image_format = "jpg"
         if "format" in message:
-            format = str(message["format"])
+            image_format = str(message["format"])
 
-        image = self.get_last_frame_as_base64_encoded_image(quality=quality, format=format, ratio=ratio)
+        image = imageprocessing.image_as_base64_encoded_image(
+            self.tracker.last_frame,
+            quality=quality,
+            image_format=image_format, ratio=ratio)
+
         if image is not None:
-            self.send_to_client(socket, "frame", dict(
+            return dict(
                 image=dict(
                     data=image,
-                    format=format)
-            ))
+                    format=image_format)
+            )
 
     def on_message_stabilize(self, message, socket, type):
+        """
+        Client requests to start stabilizing image
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         self.tracker.state.start("stabilize")
 
     def on_message_prop(self, message, socket, type):
+        """
+        Client set a value of a property...
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         prop_path = message["path"]
         prop_value = message["value"]
         print("prop " + str(socket.data))
-        self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=False)
+        self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
 
     def on_message_prop_description(self, message, socket, type):
+        """
+        Client requests the properties this server holds. i.e. it's property API...
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         used_props = (self.tracker.properties, self.properties)
         description = collections.OrderedDict()
         for prop in used_props:
             description[prop.name] = prop.as_description()
-        self.send_to_client(socket, type, description)
+
+        return description
 
     def on_message_prop_all(self, message, socket, type):
+        """
+        Client requests all the propery values for a specif property set...
+        :param message:
+        :param socket:
+        :param type:
+        :return:
+        """
         which_prop = message['properties_name']
         p = None
         if which_prop == "coloured_ball_tracker":
@@ -141,9 +241,14 @@ class SoundOfColour(PropertiesListener):
         elif which_prop == "sound-of-colour":
             p = self.properties
         if p is not None:
-            self.send_to_client(socket, type, p.contents())
+            return p.contents()
 
     def on_client_message(self, socket):
+        """
+        receives a json messages and passes it to a message handler...
+        :param socket:
+        :return:
+        """
         if socket.data == "undefined":
             return
         try:
@@ -153,10 +258,15 @@ class SoundOfColour(PropertiesListener):
             return
 
         type = message["type"]
+
         if type in self.message_handlers:
-            fun = self.message_handlers[type]
+            message_handler = self.message_handlers[type]
+
             try:
-                fun(message, socket, type)
+                data = message_handler(message, socket, type)
+                if data is not None:
+                    self.send_to_client(socket, type, data)
+
             except Exception as e:
                 logging.error(traceback.format_exc())
 
@@ -169,6 +279,7 @@ class SoundOfColour(PropertiesListener):
             self.socket_server = SoundOfColourSocketServer(port=8001)
             self.socket_server.set_on_client_connected(lambda socket, x=self: x.on_client_connected(socket))
             self.socket_server.set_on_client_message(lambda socket, x=self: x.on_client_message(socket))
+            self.socket_server.set_on_client_closed(lambda socket, x=self: x.on_client_closed(socket))
             while True:
                 self.socket_server.serveonce()  # this is slow.... move to server
                 if self.tracker.is_thread_running() is False:
@@ -177,6 +288,9 @@ class SoundOfColour(PropertiesListener):
 
         except KeyboardInterrupt:
             print("CRTL + C -> starting to stop tracker...")
+            pass
+        except SystemExit:
+            print("System Exit Called...")
             pass
         finally:
             self.tracker.stop_and_wait_until_stopped()

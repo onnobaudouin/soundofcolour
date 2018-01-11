@@ -1,6 +1,7 @@
 from framespersecond import FramesPerSecond
 from threading import Thread
 import time
+import imageprocessing as imageprocessing
 
 
 class VideoStream:
@@ -64,17 +65,10 @@ class VideoStream:
         # return the frame most recently read or None if not changed
         if self.new_frame_available:
             self.new_frame_available = False
-            return self.frame, self.frame, self.frame_count, self.resolution_of(self.frame)
+            return self.frame, self.frame, self.frame_count, imageprocessing.resolution_of(self.frame)
         else:
             self.duplicate_frames_per_second_requests.add()
-            return None, self.frame, self.frame_count, self.resolution_of(self.frame)
-
-    @staticmethod
-    def resolution_of(frame=None):
-        if frame is not None:
-            return frame.shape[1], frame.shape[0]  # height / width?
-        else:
-            return None
+            return None, self.frame, self.frame_count, imageprocessing.resolution_of(self.frame)
 
     def stop_and_wait_until_stopped(self):
         if self.thread is None:
@@ -92,7 +86,7 @@ class VideoStream:
             print("Error a frame was set to None")
         else:
             self.frame = frame
-            self.actual_resolution = self.resolution_of(frame)
+            self.actual_resolution = imageprocessing.resolution_of(frame)
             if self.actual_resolution != self.wanted_resolution:
                 print("actual resolution is not same as wanted_resolution, adjusting... " +
                       str(self.actual_resolution) + ' wanted:' + str(self.wanted_resolution))

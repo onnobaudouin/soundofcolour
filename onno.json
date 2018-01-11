@@ -1,9 +1,10 @@
 {
   "tracker": {
-    "blur": 1,
-    "min_circle": 12,
+    "blur": 0,
+    "min_circle": 1,
     "max_circle": 222,
-    "min_area": 51
+    "min_area": 16,
+    "distance": 0.21402722729622609
   },
   "ui": {
     "show_masks": true
@@ -18,8 +19,8 @@
       ],
       "min_hsv": [
         188,
-        0.5098039215686274,
-        0.3137254901960784
+        0.5824142156862745,
+        0.8431372549019608
       ],
       "max_hsv": [
         213,
@@ -64,7 +65,7 @@
       ]
     },
     "orange": {
-      "enabled": false,
+      "enabled": true,
       "rgb": [
         85,
         28,
