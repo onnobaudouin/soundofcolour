@@ -1,4 +1,4 @@
-from hardware import Hardware
+import hardware
 from mouseinteraction import MouseInteraction
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
@@ -6,14 +6,14 @@ from threading import Thread
 from videostream import VideoStream
 from balltracker import BallTracker
 from propertiesopencvui import *
-import numpy as np
 from trackedball import TrackedBall
 from trackedcolour import TrackedColour
 from stateengine import *
+import imageprocessing as imageprocessing
 
 
 class ColouredBallTracker(object):
-    IS_RUNNING_ON_PI = Hardware.is_raspberry_pi()
+    IS_RUNNING_ON_PI = hardware.is_raspberry_pi()
 
     def __init__(self):
         self.properties = self.create_properties()
@@ -29,7 +29,8 @@ class ColouredBallTracker(object):
         self.main_loop_fps = FramesPerSecond()
         self.update_handler = None
         self.thread = None
-        self.is_stopping = False
+        self.thread_should_be_running = False
+        self.thread_killed_by_thread = False
         self.is_showing_ui = None
 
         self.frame = None
@@ -67,11 +68,12 @@ class ColouredBallTracker(object):
             frame_rate = 60
         return resolution, frame_rate
 
-    def load_properties(self):
-        if self.IS_RUNNING_ON_PI:
-            filename = "pi.json"
-        else:
-            filename = "onno.json"
+    def load_properties(self, filename: str=None):
+        if filename is None:
+            if self.IS_RUNNING_ON_PI:
+                filename = "pi.json"
+            else:
+                filename = "onno.json"
         self.properties.load(filename)
 
     def show_properties(self):
@@ -84,7 +86,8 @@ class ColouredBallTracker(object):
     def close_properties(self):
         self.properties_ui.close()
 
-    def create_properties(self) -> Properties:
+    @classmethod
+    def create_properties(cls) -> Properties:
         props = Properties('coloured_ball_tracker')
         tracker = props.add_group("tracker")
         tracker.add("blur", PropNodeType.unsigned_int, maximum=250)
@@ -96,8 +99,8 @@ class ColouredBallTracker(object):
         ui.add("show_masks", PropNodeType.bool)
 
         colours2 = props.add_group("colours")
-        col = ["blue", "green", "yellow", "orange", "pink"]
-        for name in col:
+        cols = ["blue", "green", "yellow", "orange", "pink"]
+        for name in cols:
             colour = colours2.add_group(name)
             colour.add('enabled', PropNodeType.bool, default=True)
             colour.add('rgb', PropNodeType.rgb)
@@ -112,54 +115,28 @@ class ColouredBallTracker(object):
         self.ball_tracker.set_max_distance(width * 0.05)
         pass
 
-    def blur(self, frame, size):
-        # todo: change dependant on platform?
-        # frame = cv2.bilateralFilter(frame, 9, 75, 75)  # might be better
-        # frame = cv2.medianBlur(frame, 15)
-        if size % 2 == 0:
-            size = size + 1
-        return cv2.GaussianBlur(frame, (size, size), 0)
-
-    def show_difference(self, original_frame, new_frame):
-        if original_frame is not None:
-            diff = cv2.absdiff(original_frame, new_frame)
-            cv2.imshow('diff', diff)
-
-    def mask_of_colour(self, input_frame_hsv, lower_range, higher_range):
-        return cv2.inRange(input_frame_hsv, lower_range, higher_range)
-
-    def contours_of_colour_range_in(self, mask_frame):
-
-        # http://docs.opencv.org/trunk/d9/d8b/tutorial_py_contours_hierarchy.html
-        # we use external so any small 'gaps' are ignored, e.g. a highlight for example within a sphere..
-        image, contours, hierarchy = cv2.findContours(mask_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        return contours
-
-    def hue_saturation_value_frame_of(self, bgr_frame):
-        return cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
-
     def resolution(self):
         if self.frame is not None:
             return self.video_stream.resolution_of(self.frame)
         return -1, -1
 
-    def coloured_balls_in(self, bgr_frame, colours, min_enclosing=0, max_enclosing=20,
+    @classmethod
+    def coloured_balls_in(cls, bgr_frame, colours, min_enclosing=0, max_enclosing=20,
                           min_area_in_pixels=10000000):
         # this is SLOW
-        hsv_frame = self.hue_saturation_value_frame_of(bgr_frame)
+        hsv_frame = imageprocessing.hue_saturation_value_frame_of(bgr_frame)
 
         new_balls = []
 
         for colour in colours:
-            mask = self.mask_of_colour(hsv_frame, colour.minimum_hsv, colour.maximum_hsv)
+            mask = imageprocessing.mask_of_colour(hsv_frame, colour.minimum_hsv, colour.maximum_hsv)
 
             # TODO: optimize for platform as usefull
             # # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel(), iterations=1)
             # # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel(), iterations=2)
             colour.mask = mask
             #
-            contours = self.contours_of_colour_range_in(colour.mask)
+            contours = imageprocessing.contours_of_colour_range_in(colour.mask)
 
             for contour in contours:
                 # todo profile which is the quickest bounce
@@ -194,21 +171,12 @@ class ColouredBallTracker(object):
             if colour_node.value_of('enabled') is True:
                 tracked_colour = TrackedColour(
                     name=colour_node.name,
-                    minimum_hsv=self.hsv_to_np_array(colour_node.value_of('min_hsv')),
-                    maximum_hsv=self.hsv_to_np_array(colour_node.value_of('max_hsv')),
+                    minimum_hsv=imageprocessing.hsv_to_np_array(colour_node.value_of('min_hsv')),
+                    maximum_hsv=imageprocessing.hsv_to_np_array(colour_node.value_of('max_hsv')),
                     rgb=colour_node.value_of('rgb')
                 )
                 tracked_colours.append(tracked_colour)
         return tracked_colours
-
-    def hsv_to_np_array(self, hsv):
-        """
-        Convert a normal Properties HSV (360.0, 0.0->1.0, 0.0->1.0) to a openCV one (0-180,0->255,0->255)
-        :param hsv:
-        :return:
-        """
-        hsv_tuple = (int(hsv[0] / 2.0), int(hsv[1] * 255.0), int(hsv[1] * 255.0))
-        return np.array(hsv_tuple)
 
     def process_frame(self, frame):
         active_colours = self.colours_to_track()
@@ -218,7 +186,7 @@ class ColouredBallTracker(object):
         # pre blur to smooth image
         blur = props.value_of('tracker/blur')
         if blur > 0:
-            frame = self.blur(frame, blur)
+            frame = imageprocessing.blur(frame, blur)
 
         min_enclosing = props.value_of('tracker/min_circle')
         max_enclosing = props.value_of('tracker/max_circle')
@@ -239,9 +207,9 @@ class ColouredBallTracker(object):
 
         cv_draw_all = -1
         for ball in balls_in_frame:
-            cv2.drawContours(frame, [ball.contour], cv_draw_all, self.bgr_of(ball.colour.rgb))
+            cv2.drawContours(frame, [ball.contour], cv_draw_all, imageprocessing.bgr_of(ball.colour.rgb))
             (x, y) = ball.pos
-            cv2.circle(frame, (int(x), int(y)), int(ball.radius), self.bgr_of(ball.colour.rgb), thickness=1)
+            cv2.circle(frame, (int(x), int(y)), int(ball.radius), imageprocessing.bgr_of(ball.colour.rgb), thickness=1)
 
         self.ball_tracker.update(balls_in_frame)
 
@@ -259,11 +227,12 @@ class ColouredBallTracker(object):
     def balls(self):
         return self.ball_tracker.balls
 
-    def bgr_of(self, rgb):
-        (r, g, b) = rgb
-        return (b, g, r)
-
     def update(self):
+        """
+        Attempts to fetch a new image from the video stream
+        then does all the analyis as setup. So might not do anything if no new frame was available...
+        :return:
+        """
         vs = self.video_stream
         new_frame, last_valid_frame, frame_count, resolution = vs.latest()
         if new_frame is not None:
@@ -292,20 +261,37 @@ class ColouredBallTracker(object):
             self.last_frame = cvh.clone_image(self.frame)
 
     def start(self):
+        if self.is_thread_running():
+            print("We are already running... ignored start request")
+            return
         self.thread = Thread(target=self.run, args=())
         self.thread.daemon = True
+        self.thread_should_be_running = True
         self.thread.start()
 
-    def stop(self):
+    def stop_and_wait_until_stopped(self):
+        if self.is_thread_running() is False:
+            print("Coloured Ball Tracker is already stopped - ignored")
+            return
         # stop the thread and release any resources
         print("stopping coloured ball tracker")
-        self.is_stopping = True
+        self.thread_should_be_running = False
         self.thread.join()  # this is blocking...
-
-    def stopped(self):
-        print("stopped coloured ball tracker")
-        self.is_stopping = False
         self.thread = None
+        print("stopped coloured ball tracker")
+
+    def stop_thread_by_thread(self):
+        """
+        Call this to kill the thread from within it... this will lead to a cleaner cleanup
+        """
+        self.thread_killed_by_thread = True
+        self.thread_should_be_running = False
+
+    def is_thread_running(self):
+        if self.thread_killed_by_thread is True:
+            self.thread = None
+            self.thread_killed_by_thread = False
+        return self.thread is not None and self.thread.is_alive()
 
     def show_ui(self, state=True):
         if state == self.is_showing_ui:
@@ -324,10 +310,19 @@ class ColouredBallTracker(object):
             # what to do with MOUSe???
 
     def run(self):
+        """
+        Do not call directly use start instead.
+        main loop to take care of all the processing
+
+        this is a blocking call.
+
+        Also deals with the UI, if any
+        :return:
+        """
         try:
             self.video_stream = self.start_video_stream()
             self.state.start('wait_for_first_frame')
-            while True:
+            while self.thread_should_be_running:
                 self.main_loop_fps.add()  # track only for performance reasons.
                 self.show_ui(self.is_showing_ui)  # has the ui showing been changed?
 
@@ -336,19 +331,19 @@ class ColouredBallTracker(object):
                 if self.is_showing_ui:
                     key = cv2.waitKey(1) & 0xFF
                     if key == ord('q'):
-                        break
+                        print("Pressed Quit")
+                        self.stop_thread_by_thread()
                     if key == ord("s"):
                         self.state.start("stabilize")
 
-                if self.thread is not None and self.is_stopping is True:
-                    break
-
-        except KeyboardInterrupt:
-            print("CRTL + C")
+        except Exception as exc:
+            print(exc)
         finally:
             self.show_ui(False)
-            self.video_stream.start_stop()
-            self.stopped()
+            self.video_stream.stop_and_wait_until_stopped()
+
+        if self.thread_killed_by_thread:
+            print("Coloured Ball Thread is closing, as caused by Quit Action")
 
     def run_wait_for_first_frame(self):
         self.change_resolution(self.video_stream.resolution_of(self.frame))

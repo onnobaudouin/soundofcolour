@@ -29,8 +29,8 @@ class SoundOfColour(PropertiesListener):
             prop_all=self.on_message_prop_all
         )
 
-    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool=True):
-        #if from_runtime_change is False:
+    def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool = True):
+        # if from_runtime_change is False:
         #    print("Prop changed but was non-ui")
         #    return
         if prop.type != PropNodeType.group:
@@ -126,7 +126,6 @@ class SoundOfColour(PropertiesListener):
         print("prop " + str(socket.data))
         self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=False)
 
-
     def on_message_prop_description(self, message, socket, type):
         used_props = (self.tracker.properties, self.properties)
         description = collections.OrderedDict()
@@ -165,16 +164,23 @@ class SoundOfColour(PropertiesListener):
             print("unknown message: " + str(socket.data))
 
     def run(self):
-        self.tracker.start()
-        self.socket_server = SoundOfColourSocketServer(port=8001)
-        self.socket_server.set_on_client_connected(lambda socket, x=self: x.on_client_connected(socket))
-        self.socket_server.set_on_client_message(lambda socket, x=self: x.on_client_message(socket))
-        while True:
-            self.socket_server.serveonce()  # this is slow.... move to server
-            if self.tracker.thread is None:
-                break
+        try:
+            self.tracker.start()
+            self.socket_server = SoundOfColourSocketServer(port=8001)
+            self.socket_server.set_on_client_connected(lambda socket, x=self: x.on_client_connected(socket))
+            self.socket_server.set_on_client_message(lambda socket, x=self: x.on_client_message(socket))
+            while True:
+                self.socket_server.serveonce()  # this is slow.... move to server
+                if self.tracker.is_thread_running() is False:
+                    print("ColouredBallTracker was shut down by itself - closing whole program")
+                    break
+
+        except KeyboardInterrupt:
+            print("CRTL + C -> starting to stop tracker...")
             pass
-        self.socket_server.close()
+        finally:
+            self.tracker.stop_and_wait_until_stopped()
+            self.socket_server.close()
 
 
 if __name__ == '__main__':

@@ -30,9 +30,18 @@ def clone_image(image):
 
 
 def bgr_to_hsv(b, g, r):
+    """
+    Takes an RGB in and sends out an HSV in 0..360, 0..255, 0..255 range
+    :param b:
+    :param g:
+    :param r:
+    :return:
+    """
     image = np.uint8([[[b, g, r]]])
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    return hsv_image[0, 0]
+    hsv = hsv_image[0, 0]
+    return [int(hsv[0] * 2.0), hsv[1], hsv[2]]
+
 
 
 def draw_shadow_arrow(frame, from_point, to_point, colour=(255, 255, 255), thickness=1):

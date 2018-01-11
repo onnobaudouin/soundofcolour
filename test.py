@@ -343,17 +343,17 @@ def do(colours):
 
     props = Properties()
     ui = props.group("ui")
-    ui.add("blur", PropType.unsigned_int, maximum=250)
-    ui.add("min_circle", PropType.unsigned_int, maximum=250)
-    ui.add("max_circle", PropType.unsigned_int, maximum=250)
-    ui.add("show_masks", PropType.bool)
-    ui.add("min_area", PropType.unsigned_int)
+    ui.add("blur", PropNodeType.unsigned_int, maximum=250)
+    ui.add("min_circle", PropNodeType.unsigned_int, maximum=250)
+    ui.add("max_circle", PropNodeType.unsigned_int, maximum=250)
+    ui.add("show_masks", PropNodeType.bool)
+    ui.add("min_area", PropNodeType.unsigned_int)
     colours2 = props.group("colours")
     col = ["blue", "green", "yellow", "orange", "pink"]
     for name in col:
         colour = colours2.group(name)
-        colour.add('min_hsv', PropType.hsv)
-        colour.add('max_hsv', PropType.hsv)
+        colour.add('min_hsv', PropNodeType.hsv)
+        colour.add('max_hsv', PropNodeType.hsv)
 
     if IS_RASPBERRY_PI:
         filename = "pi.json"

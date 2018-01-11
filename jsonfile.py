@@ -2,6 +2,7 @@ import sys
 import json
 
 
+# todo: remove class as just static methods...
 class JSONFile:
     @staticmethod
     def load(filename):
@@ -20,7 +21,7 @@ class JSONFile:
     def save(filename, data):
         try:
             with open(filename, 'w') as data_file:
-                json_data = json.dumps(data,indent=2)
+                json_data = json.dumps(data, indent=2)
 
                 data_file.write(json_data)
                 print("saved: " + filename)

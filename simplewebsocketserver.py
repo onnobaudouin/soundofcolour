@@ -577,6 +577,7 @@ class SimpleWebSocketServer(object):
         self.websocketclass = websocketclass
         self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO)
         self.serversocket.bind((host, port))
         self.serversocket.listen(5)
         self.selectInterval = selectInterval
@@ -603,6 +604,7 @@ class SimpleWebSocketServer(object):
             try:
                 client.handleClose()
             except:
+                print("issue with closing websocket")
                 pass
 
     def serveonce(self):

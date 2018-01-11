@@ -18,11 +18,11 @@ class TrackedBall:
         self.contour = contour
         # self.division = None
 
-    @staticmethod
-    def get_new_id():
-        # todo compress id's?
-        new_id = TrackedBall.next_id
-        TrackedBall.next_id = TrackedBall.next_id + 1
+    @classmethod
+    def get_new_id(cls):
+        # todo compress id's?, i.e. with freein up?
+        new_id = cls.next_id
+        cls.next_id = cls.next_id + 1
         return new_id
 
     def update(self, ball):

@@ -62,7 +62,7 @@ class PropertyUIMultipleOpenCV(PropertyUIOpenCV):
         return PropertyUIOpenCV(self.window_name,
                                 self.prop,
                                 self.prop.name + '_' + self.prop.names[index],
-                                self.min_ui[index],
+                                self.min_ui[index], # this is surely a bug self.min is an int???
                                 self.max_ui[index],
                                 self, visual=True)
 
@@ -93,7 +93,7 @@ class PropertyUIHSVOpenCV(PropertyUIMultipleOpenCV):
         return [int(prop_value[0]), int(prop_value[1] * 255.0), int(prop_value[2] * 255.0)]
 
     def ui_to_prop(self, ui_value):
-        return float(ui_value[0]), float(ui_value[1]) / 255.0, float(ui_value[2]) / 255.0
+        return int(ui_value[0]), float(ui_value[1]) / 255.0, float(ui_value[2]) / 255.0
 
 
 class PropertiesOpenCVUI(PropertiesListener):
@@ -129,8 +129,8 @@ class PropertiesOpenCVUI(PropertiesListener):
         """
         self.sync_ui_to_prop(prop.path_as_str())
 
-    @staticmethod
-    def create_ui_for_property(prop: Property, window_name) -> PropertyUIOpenCV:
+    @classmethod
+    def create_ui_for_property(cls, prop: Property, window_name) -> PropertyUIOpenCV:
         if prop.type == PropNodeType.rgb:
             return PropertyUIRGBOpenCV(window_name, prop)
         elif prop.type == PropNodeType.hsv:

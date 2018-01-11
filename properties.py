@@ -395,7 +395,8 @@ class Properties(PropertyNode):
         for listener in self.on_changed_listeners:
             listener.on_prop_updated(prop, from_runtime_change)
 
-    def fire(self, handler, *args):
+    @classmethod
+    def fire(cls, handler, *args):
         handler(*args)
 
 

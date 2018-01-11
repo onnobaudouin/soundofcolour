@@ -7,9 +7,8 @@ class VideoStream:
     def __init__(self, wanted_resolution=(320, 240), wanted_frame_rate=30):
         print("Starting VideoStream: " + str(wanted_resolution) + ' ' + str(wanted_frame_rate))
         self.wanted_resolution = wanted_resolution
-        self.wanted_frame_reate = wanted_frame_rate
-        self.is_stopped = False
-        self.is_stopping = False
+        self.wanted_frame_rate = wanted_frame_rate
+
         self.frame = None
         self.frame_count = 0
         self.new_frame_available = False
@@ -20,23 +19,23 @@ class VideoStream:
         self.stabilize_frame_counter = 0
         self.is_stabilizing = False
         self.thread = None
+        self.thread_should_be_running = False
 
     def update_stats(self):
         self.frame_count = self.frame_count + 1
         self.frames_per_second.add()
 
     def start(self):
+        if self.thread is not None:
+            print("Video Stream already running, ignored request")
+            return
         self.thread = Thread(target=self.update, args=())
         self.thread.daemon = True
+        self.thread_should_be_running = True
         self.thread.start()
         print("Waiting for Video Stream to initialize:" + str(self.wait_time_after_start) + 's')
         time.sleep(self.wait_time_after_start)  # stabilize - recommended practice
         return self
-
-    # must be called when thread has stopped..
-    def stopped(self):
-        print("stopped video stream...")
-        self.is_stopped = True
 
     def update(self):
         # process each frame
@@ -77,11 +76,16 @@ class VideoStream:
         else:
             return None
 
-    def start_stop(self):
+    def stop_and_wait_until_stopped(self):
+        if self.thread is None:
+            print("Video Stream is already stopped - ignored")
+            return
         # stop the thread and release any resources
         print("stopping video stream...")
-        self.is_stopping = True
+        self.thread_should_be_running = False
         self.thread.join()
+        self.thread = None
+        print("stopped video stream...")
 
     def set_frame(self, frame, is_new_frame=True):
         if frame is None:
@@ -120,6 +124,7 @@ if __name__ == '__main__':
     import cv2
     import sys
 
+    vs = None
     try:
         vs = VideoStream.create()
         vs.start()
@@ -140,4 +145,5 @@ if __name__ == '__main__':
     except:
         print("Unexpected error:", sys.exc_info()[0])
     finally:
-        vs.start_stop()
+        if vs is not None:
+            vs.stop_and_wait_until_stopped()

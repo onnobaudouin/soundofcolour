@@ -1,3 +1,4 @@
+# this file should only be imported when running on RPI
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from videostream import VideoStream
@@ -16,20 +17,20 @@ class PiVideoStream(VideoStream):
 
     def update(self):
         for frame in self.stream:  # todo check if we need to use 'with'
-            if self.is_stopping:
+            if self.thread_should_be_running:
+                self.set_frame(frame.array)
+                self.raw_capture.truncate(0)
+            else:
                 self.stream.close()
                 self.raw_capture.close()
                 self.camera.close()
-                self.stopped()
-                return
-            self.set_frame(frame.array)
-            self.raw_capture.truncate(0)
+                return  # exits for loop and end thread
 
     def flip_horizontal(self, flip=True):
         self.camera.hflip = flip
 
     # def resolution(self):
-     #   return self.camera.resolution
+    #   return self.camera.resolution
 
     def on_start_stabilize(self):
         self.camera.exposure_mode = 'auto'

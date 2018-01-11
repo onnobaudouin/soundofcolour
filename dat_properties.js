@@ -41,7 +41,7 @@ class DatGUIPropertiesView {
             case PropNodeType.hsv:
             {
                 let t = prop_node.value();
-                this.gui_obj[path] = {h:t[0], s:t[1], v:t[2]};
+                this.gui_obj[path] = {h:parseInt(t[0]), s:t[1], v:t[2]};
                 prop_node.dat_controller.updateDisplay(); //update ui.
             } break;
         }
@@ -66,7 +66,7 @@ class DatGUIPropertiesView {
             } break;
             case PropNodeType.hsv:
             {
-                if(prop_node.set([value.h / 2, value.s, value.v], undefined, true)) { //2 because opencv - maybe change this as H does mean 360?
+                if(prop_node.set([parseInt(value.h), value.s, value.v], undefined, true)) { //2 because opencv - maybe change this as H does mean 360?
                     this.notify(prop_node);
                 }
             } break;

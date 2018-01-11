@@ -37,7 +37,6 @@
                 this.canvas2d = null;
                 this.img = null;
                 this.show_ui = false;
-                this.frame_quality = 30;
                 this.frame_grabber_id = null;
                 this.is_grabbing_frame = false;
                 this.properties_ui = null;
@@ -64,9 +63,6 @@
                 this.toggle_ui_button.addEventListener('click', () => {
                     this.toggle_ui();
                 });
-
-               // this.connect_prop_slider('tracker/blur');
-               // this.connect_prop_slider('frame/quality');
 
             }
 
