@@ -1,20 +1,18 @@
-import numpy as np
 import cv2
 import sys
 from hardware import *
 import mouseinteraction as mouse
-from trackedcolour import TrackedColour
+from python.trackedcolour import TrackedColour
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
-from videostream import VideoStream
+from python.videostream import VideoStream
 from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
-from soundsocketserver import SoundSocketServer
+from python.soundsocketserver import SoundSocketServer
 from simplewebserver import *
-from web import *
+from python.web import *
 from propertiesopencvui import *
-from transitions import Machine  # https://github.com/pytransitions/transitions
 
 
 def setup_pygame_mixer():

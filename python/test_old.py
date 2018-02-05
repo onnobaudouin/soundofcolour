@@ -1,23 +1,19 @@
-import numpy as np
 import cv2
 import sys
 import mouseinteraction as mouse
-from trackedcolour import TrackedColour
+from python.trackedcolour import TrackedColour
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
-from pprint import pprint
-from videostream import VideoStream
-from trackedball import TrackedBall
+from python.videostream import VideoStream
 from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
 #from psonic import *
-import math
 #import pygame
 #import pygame.mixer
-from soundsocketserver import SoundSocketServer
+from python.soundsocketserver import SoundSocketServer
 from simplewebserver import *
-from web import *
+from python.web import *
 
 guitar = None
 

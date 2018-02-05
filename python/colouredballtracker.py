@@ -3,18 +3,18 @@ from mouseinteraction import MouseInteraction
 from framespersecond import FramesPerSecond
 import threading
 from threading import Thread
-from videostream import VideoStream
+from python.videostream import VideoStream
 from balltracker import BallTracker
 from propertiesopencvui import *
-from trackedball import TrackedBall
-from trackedcolour import TrackedColour
-from stateengine import *
+from python.trackedball import TrackedBall
+from python.trackedcolour import TrackedColour
+from python.stateengine import *
 import imageprocessing as imageprocessing
 import traceback
 import logging
 import numpy as np
 import queue
-from typing import Dict, Tuple, List, Any
+from typing import Tuple, List, Any
 from potentialcolouredball import PotentialColouredBall
 
 

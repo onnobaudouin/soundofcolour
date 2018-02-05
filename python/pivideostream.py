@@ -1,7 +1,7 @@
 # this file should only be imported when running on RPI
 from picamera.array import PiRGBArray
 from picamera import PiCamera
-from videostream import VideoStream
+from python.videostream import VideoStream
 
 
 class PiVideoStream(VideoStream):

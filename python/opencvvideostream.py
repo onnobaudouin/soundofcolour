@@ -1,6 +1,6 @@
 # import the necessary packages
 import cv2
-from videostream import VideoStream
+from python.videostream import VideoStream
 
 
 class OpenCVVideoStream(VideoStream):
