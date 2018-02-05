@@ -11,6 +11,8 @@
     <script src="value_to_json.js"></script>
     <script src="dat.gui.min.js"></script>
     <script src="dat_properties.js"></script>
+    <!-- https://github.com/balint42/diff.js/tree/master -->
+    <script src="diff.js-master/diff.min.js"></script>
     <script>
         function object_to_map(object) {
             let m = new Map();
@@ -21,11 +23,203 @@
             }
             return m;
         }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+
+            if (s === 0) {
+                r = g = b = l; // achromatic
+            } else {
+                let hue2rgb = function hue2rgb(p, q, t) {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1 / 6) return p + (q - p) * 6 * t;
+                    if (t < 1 / 2) return q;
+                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                    return p;
+                };
+
+                let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                let p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+            }
+
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+    </script>
+    <script>
+        //http://dev.theomader.com/gaussian-kernel-calculator/
+        function gaussian_kernel(size) {
+            const kerns = [
+                [1],
+                null,
+                [0.27901, 0.44198, 0.27901],
+                null,
+                [0.06136, 0.24477, 0.38774, 0.24477, 0.06136],
+                null,
+                [0.00598, 0.060626, 0.241843, 0.383103, 0.241843, 0.060626, 0.00598]
+            ];
+            //Q kerns[size].handle(out_of_bound:0)
+            //  element(kerns, size, if out_of_bound)
+            //size.is_between(1, 8)
+            if (size >= 1 && size < 8) {
+                return kerns[size - 1]; //0 indexede
+            }
+            return null;
+        }
+
+        function gaussian_blur(hist, size = 5, circular = true) {
+            const kernel = gaussian_kernel(size);
+            if (kernel === null) {
+                console.log('Not A Valid Gaussian Kernel Size ' + size);
+                return hist;
+            }
+            let index = 0;
+            let kern_index = 0;
+            const len = hist.length;
+            let output = filled_array(len, 0);
+            let offset = 0;
+            const neg = Math.floor(size / 2.0);
+            let value = 0;
+
+            //1 D CONVOLVE
+            for (; index < len; index++) { //FOR ALL ELEMENTS
+                value = 0;
+                for (kern_index = 0; kern_index < size; kern_index++) {
+                    offset = index + kern_index - neg;
+                    if (offset < 0) {
+                        if (circular) {
+                            offset = len + offset; // - -
+                        } else {
+                            offset = 0; //repeat keft most
+                        }
+                    } else if (offset >= len) {
+                        if (circular) {
+                            offset = offset % len;
+                        } else {
+                            offset = len - 1;
+                        }
+                    }
+                    value += (kernel[kern_index] * hist[offset]);
+                }
+                output[index] = value;
+            }
+
+            //console.log(output);
+            return output;
+        }
+
+        function blur(hist, size = 5, circular = true, times = 1) {
+            let output = hist;
+            for (let i = 0; i < times; i++) {
+                output = gaussian_blur(output, size, circular);
+            }
+            return output;
+        }
+
+
+        function findLocalMaxima(hist, window_size = 5, is_circular = true) {
+            if (window_size % 2 === 0) {
+                console.log("window_size must be uneven. findLocalMaxima");
+                return null;
+            }
+            const len = hist.length;
+            const output = [];
+            let index = 0;
+            let current_value = 0;
+            const either_side = Math.floor(window_size / 2.0);
+            let window_index = 0;
+            let is_highest = false;
+            for (; index < len; index++) { //FOR ALL ELEMENTS
+                current_value = hist[index];
+                is_highest = true;
+                for (window_index = index - either_side; window_index < index + either_side; window_index++) {
+                    if (window_index !== index) { //ignore self
+                        if (is_circular === false) {
+                            if (window_index >= 0 && window_index < len) { //only when in bounds
+                                if (hist[window_index] > current_value) {
+                                    is_highest = false; //someone else is bigger...
+                                    break;
+                                }
+                                //what if equal - i.e. if 3 or more thing are same height we should pick the middle one
+                            }
+                        } else {
+                            let t_index = window_index;
+                            if (window_index < 0) {
+                                t_index = len + window_index;
+                            } else if (window_index >= len) {
+                                t_index = window_index - len + 1; //256 -> 1
+                            }
+                            if (hist[t_index] > current_value) {
+                                is_highest = false; //someone else is bigger...
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (is_highest) {
+                    if (current_value !== 0) {
+                        output.push(index);
+                    }
+                }
+            }
+            return output;
+
+
+        }
+
+        function filled_array(size, value) {
+            return Array(size).fill(value);
+        }
+
     </script>
 
-
-
     <script language="javascript" type="text/javascript">
+
+        class Histogram {
+            constructor(running_samples = 5) {
+                this.samples = null;
+                this.running_samples = running_samples;
+                this.width = null;
+            }
+
+            addSample(sample) {
+                const width = sample.length;
+                if (this.width !== width) {
+                    console.log('resettign samples for histogram');
+                    this.samples = [];
+                    this.width = width;
+                }
+                this.samples.push(sample);
+                while (this.samples.length > this.running_samples) {
+                    this.samples.shift();
+                }
+            }
+
+            reset() {
+                this.samples = [];
+                this.width = null;
+            }
+
+            average() {
+                let avg = filled_array(this.width, 0);
+                this.samples.forEach(sample => {
+                    sample.forEach((value, index) => {
+                        avg[index] += value;  //add up all values...
+                    })
+                });
+                const len = this.samples.length;
+                if (len > 0) {
+                    return avg.map(value => Math.round(value / len));
+                }
+                return avg;
+            }
+        }
+
+
         class SoundOfColourServer extends SocketClient {
 
             constructor() {
@@ -35,16 +229,23 @@
                 this.resolution = {width: 0, height: 0};
                 /*@var Canvas2D */
                 this.canvas2d = null;
-                this.img = null;
+                this.histogramCanvas = null;
+                this.histogram2Canvas = null;
+                // this.img = null;
                 this.show_ui = false;
-                this.frame_grabber_id = null;
-                this.is_grabbing_frame = false;
                 this.properties_ui = null;
 
                 this.is_sampling_colour = false;
                 this.samplingStart = null;
                 this.samplingCurrent = null;
                 this.lastHSVHistogram = null;
+                this.lastHistogram = null;
+                this.lastColourResult = null;
+
+                this.hsv_hist = {"hue": new Histogram(), "saturation": new Histogram(), "luminosity": new Histogram()};
+
+                this.task_id = 0;
+                this.frame = null;
 
             }
 
@@ -53,7 +254,17 @@
                 this.canvas2d = new Canvas2D(this.id_extra('canvas'));
                 this.canvas2d.mouse_event_handler = (name, pos) => this.on_mouse_event(name, pos);
 
-                this.img = document.getElementById(this.id_extra('img'));
+                this.histogramCanvas = new Canvas2D(this.id_extra('histogram'));
+                this.histogramCanvas.update_resolution(256 * 2, 64 * 3);
+
+                this.histogram2Canvas = new Canvas2D(this.id_extra('histogram2'));
+                this.histogram2Canvas.update_resolution(256 * 2, 64 * 3);
+
+                this.histogramTrackCanvas = new Canvas2D(this.id_extra('histogram_track'));
+                this.histogramTrackCanvas.update_resolution(256 * 2, 64 * 3);
+
+                // this.img = document.getElementById(this.id_extra('img'));
+                //this.img.onLoad = this.imageUpdated();
 
                 this.connect_button = document.getElementById(this.id_extra('connect'));
                 this.connect_button.addEventListener('click', () => {
@@ -70,69 +281,101 @@
                     this.toggle_ui();
                 });
 
+                this.apply_ui_button = document.getElementById(this.id_extra('apply'));
+                this.apply_ui_button.addEventListener('click', () => {
+                    this.apply_colour();
+                });
+
+                this.track_ui_button = document.getElementById(this.id_extra('track'));
+                this.track_ui_button.addEventListener('click', () => {
+                    this.track_colour();
+                });
+
             }
 
             distance(x1, y1, x2, y2) {
                 const dx = x1 - x2;
                 const dy = y1 - y2;
-                return Math.sqrt(dx*dx + dy*dy);
+                return Math.sqrt(dx * dx + dy * dy);
             }
 
             on_mouse_event(event_name, position_mouse_in_canvas) {
 
-               switch (event_name) {
-                   case 'move':
-                       if(this.is_sampling_colour) {
-                           if (
-                               (this.samplingCurrent.x !== position_mouse_in_canvas.x) ||
-                               (this.samplingCurrent.y !== position_mouse_in_canvas.y) ) {
+                switch (event_name) {
+                    case 'move':
+                        if (this.is_sampling_colour) {
+                            if (
+                                (this.samplingCurrent.x !== position_mouse_in_canvas.x) ||
+                                (this.samplingCurrent.y !== position_mouse_in_canvas.y)) {
 
-                               this.samplingCurrent = position_mouse_in_canvas;
-                               const radius = this.distance(
+                                this.samplingCurrent = position_mouse_in_canvas;
+
+                                this.send_message('mouse',
+                                    {
+                                        event: 'move', x: this.samplingCurrent.xPercent,
+                                        y: this.samplingCurrent.yPercent
+                                    });
+                                const radius = this.distance(
                                     this.samplingStart.x,
                                     this.samplingStart.y,
                                     this.samplingCurrent.x,
                                     this.samplingCurrent.y);
-                               this.send_message('mouse',
-                                   {
-                                       event: 'move', x: this.samplingCurrent.xPercent,
-                                       y: this.samplingCurrent.yPercent
-                                   });
 
-                               this.send_message('sample', {
-                                   event: 'histogram_hsv',
-                                   x: this.samplingStart.xPercent,
-                                   y: this.samplingStart.yPercent,
-                                   radius: radius / position_mouse_in_canvas.width
-
-                               })
+                                this.send_tasks_per_frame("sample", "sample_hsv", "update", {
+                                    event: 'histogram_hsv',
+                                    x: this.samplingStart.xPercent, //todo: should not need to resend
+                                    y: this.samplingStart.yPercent,
+                                    radius: radius / position_mouse_in_canvas.width
+                                });
 
 
-                           }
-                       } break;
+                            }
 
-                   case 'down':
-                       if (!this.is_sampling_colour) {
-                           this.is_sampling_colour = true;
-                           this.samplingStart = position_mouse_in_canvas;
-                           this.samplingCurrent = this.samplingStart;
-                           this.send_message('mouse',
-                               {event:'down', x:this.samplingCurrent.xPercent,
-                                   y:this.samplingCurrent.yPercent});
-                       }
-                       break;
-                   case 'up': {
-                       if (this.is_sampling_colour) {
-                           this.is_sampling_colour = false;
+                        }
+                        break;
 
-                           this.send_message('mouse',
-                               {event:'up',x:position_mouse_in_canvas.xPercent,
-                                   y:position_mouse_in_canvas.yPercent});
-                           this.samplingStart = null;
-                           this.samplingCurrent = null;
-                       } break;
-                   }
-               }
+                    case 'down':
+                        if (!this.is_sampling_colour) {
+                            this.is_sampling_colour = true;
+                            this.samplingStart = position_mouse_in_canvas;
+                            this.samplingCurrent = this.samplingStart;
+                            this.send_message('mouse',
+                                {
+                                    event: 'down', x: this.samplingCurrent.xPercent,
+                                    y: this.samplingCurrent.yPercent
+                                });
+
+                            this.send_tasks_per_frame("sample", "sample_hsv", "start", {
+                                event: 'histogram_hsv',
+                                x: this.samplingStart.xPercent,
+                                y: this.samplingStart.yPercent,
+                                radius: 0
+                            });
+
+                        }
+                        break;
+                    case 'up': {
+                        if (this.is_sampling_colour) {
+                            this.is_sampling_colour = false;
+
+                            this.send_message('mouse',
+                                {
+                                    event: 'up', x: position_mouse_in_canvas.xPercent,
+                                    y: position_mouse_in_canvas.yPercent
+                                });
+                            this.samplingStart = null;
+                            this.samplingCurrent = null;
+                            /*   this.send_tasks_per_frame("sample", "sample_hsv", "stop");
+                               this.lastHSVHistogram = null;
+                               this.lastHistogram = null;
+                               this.hsv_hist.hue.reset();
+                               this.hsv_hist.saturation.reset();
+                               this.hsv_hist.luminosity.reset();*/
+
+                        }
+                        break;
+                    }
+                }
 
 
             }
@@ -146,27 +389,33 @@
 
 
             on_open(event) {
-
+                console.log("connected....");
             }
 
 
+            send_tasks_per_frame(task, id = null, state = null, data = null) {
+                task = this.get_task(task, id, state, data)
+                this.send_message("tasks_per_frame",
+                    {
+                        'tasks': [
+                            task
+                        ]
+                    });
+                return task;
+            }
 
-            maybe_request_frame() {
-                if (this.is_connected()) {
-                    //console.log('request a frame');
-                    if (this.is_grabbing_frame === false) {
-                        this.is_grabbing_frame = true;
-                        this.send_message("frame",
-                            {
-                                'quality': this.properties[0].value_of("frame/quality"), 'format': 'jpg', ratio: 1.0
-                            });
-                        return;
-                    } else {
-                        //console.log('Bounced');
-                    }
+            get_task(task, id = null, state = null, data = null) {
+                if (id === null) {
+                    id = 't_' + this.task_id++;
                 }
-                this.is_grabbing_frame = false;
+                return {
+                    "task": task,
+                    "state": state,
+                    "id": id,
+                    "data": data
+                }
             }
+
 
             update_canvas_size(width, height) {
                 this.resolution.width = width;
@@ -179,7 +428,6 @@
             }
 
 
-
             on_message_prop_description(message) {
                 let p = object_to_map(message);
                 this.properties = [];
@@ -188,13 +436,20 @@
                         this.properties.push(Properties.create_from_description_object(value));
                     }
                 });
-                console.log(this.properties);
+                //console.log(this.properties);
 
                 let t = this.properties[0];
                 let f = t.add_group('frame');
                 f.add('quality', PropNodeType.unsigned_int, 50, 0, 100);
 
-                this.frame_grabber_id = setInterval(() => this.maybe_request_frame(), 20);
+                let h = t.add_group('histogram');
+                h.add('samples', PropNodeType.unsigned_int, 30, 1, 100);
+                h.add('blur', PropNodeType.unsigned_int, 3, 1, 7); //todo - makes it ordinal
+                h.add('blur_times', PropNodeType.unsigned_int, 1, 1, 100); //todo - makes it ordinal
+                h.add('maxima_range', PropNodeType.unsigned_int, 9, 1, 256); //todo - makes it ordinal
+                h.add('maxima_threshold', PropNodeType.unsigned_float, 0.5, 0.0, 1.0); //todo - makes it ordinal
+                h.add('signal_minimum', PropNodeType.unsigned_float, 0.09, 0.0, 1.0); //todo - makes it ordinal)
+
 
                 this.properties_ui = new DatGUIPropertiesView();
                 this.properties_ui.from_properties(t);
@@ -202,16 +457,6 @@
 
                 this.coloured_ball_tracker_properties = t;
 
-            /*    console.log(t.value_of('colours/blue/enabled'));
-                console.log(t.set_value_of('colours/blue/enabled', false));
-                console.log(t.value_of('colours/blue/enabled'));
-                let c = t.contents_json();
-                console.log(c);
-                console.log(t.set_value_of('colours/blue/enabled', true));
-                console.log(t.value_of('colours/blue/enabled'));
-
-                t.from_contents_json(c);
-                console.log(t.value_of('colours/blue/enabled'));*/
 
                 this.send_message('prop_all', {'properties_name': 'coloured_ball_tracker'});
             }
@@ -220,11 +465,11 @@
                 console.log(message);
                 this.coloured_ball_tracker_properties.from_contents(message);
                 this.properties_ui.update(); //todo -> properties should warn a UI that it has changed...
-                this.properties_ui.onChanged = (prop_node) => {this.onPropChanged(prop_node);}; // this is ALL WRONG...
-                //console.log(this.coloured_ball_tracker_properties.contents_json())
-
-                this.send_message('request_balls', {}) //request balls information.
-
+                this.properties_ui.onChanged = (prop_node) => {
+                    this.onPropChanged(prop_node);
+                }; // this is ALL WRONG...
+                this.send_tasks_per_frame("frame", "frame_task", "start"); //requests frames to be sent...
+                this.send_tasks_per_frame("balls", "balls_task", "start"); //requests balls to be sent...
             }
 
             on_message_prop(message) {
@@ -235,12 +480,150 @@
             }
 
             onPropChanged(prop_node) {
-                console.log(prop_node.name+' '+prop_node.value());
-                this.update_prop(prop_node.path().join('/'), prop_node.value())
+                const path = prop_node.path_as_string();
+                switch (path) {
+                    case "frame/quality":
+                        this.send_tasks_per_frame("frame", "frame_task", "update", {'quality': prop_node.value()}); //update the frames task...
+                        break;
+                    case "histogram/samples":
+                        //console.log(prop_node.value());
+                        this.hsv_hist.hue.running_samples = prop_node.value();
+                        this.hsv_hist.saturation.running_samples = prop_node.value();
+                        this.hsv_hist.luminosity.running_samples = prop_node.value();
+                        break;
+                    default:
+                        this.send_property_update(path, prop_node.value())
+                }
+            }
+
+            on_message_tasks_per_frame(message) {
+                const tasks = message.tasks;
+                tasks.forEach(task => {
+                    switch (task.task) {
+                        case "frame":
+                            this.task_frame(task.result);
+                            break;
+                        case "balls":
+                            this.task_balls(task.result);
+                            break;
+                        case "sample":
+                            this.task_sample(task.result);
+                            break;
+                        case "track":
+                            this.task_track(task.result);
+                            break;
+                    }
+                });
+
+
+            }
+
+            imageUpdated() {
+                // we cannot draw immediatley if frame is not loaded...
+                this.canvas2d.clear();
+                if (this.frame !== null) {
+                    this.canvas2d.image(this.frame);
+                }
+                this.balls.forEach(ball => {
+                    this.canvas2d.circle(ball.x, ball.y, ball.radius, ball.colour)
+                });
+
+                this.histogramCanvas.clear();
+                this.histogram2Canvas.clear();
+
+                const p = this.properties[0];
+
+                const blur_size = p.value_of('histogram/blur');
+                const blur_times = p.value_of('histogram/blur_times');
+                const maxima_threshold = p.value_of('histogram/maxima_threshold');
+
+
+                if (this.lastHSVHistogram !== null) {
+                    const colors = ["hue", "saturation", "luminosity"];
+                    // console.log(message.pixel_count);
+                    colors.forEach((color, index) => {
+                        let hist = this.lastHSVHistogram.histogram_hsv[index];
+                        hist = blur(hist, blur_size, (index === 0), blur_times);
+                        const max = this.max_of_histogram(hist);
+                        this.draw_histogram_hsv(hist, colors[index], max, this.histogramCanvas);
+
+                    });
+                    this.histogramCanvas.text(20, 20, this.lastHSVHistogram.pixel_count + "");
+
+                    this.lastColourResult = {};
+                    //avergae
+                    colors.forEach((color, index) => {
+                        let avg = this.hsv_hist[color].average();
+                        avg = this.remove_low_signal(avg);
+                        const avg_blur = blur(avg, blur_size, (index === 0), blur_times);
+                        let max = this.max_of_histogram(avg_blur);
+                        this.lastColourResult[color] = this.draw_histogram_hsv(avg_blur, color, Math.round(max), this.histogram2Canvas);
+
+                    });
+                }
+                if (this.lastHistogram !== null) {
+                    const colors = [[0, 0, 255], [0, 255, 0], [255, 0, 0]];
+                    colors.forEach((color, index) => {
+                        const hist = this.lastHistogram.histogram[index];
+                        const max = hist.reduce((max, cur) => Math.max(max, cur), 0);
+                        this.draw_histogram(hist, colors[index], max, /*this.lastHistogram.pixel_count*/);
+                    });
+                }
+            }
+
+            max_of_histogram(hist) {
+                return hist.reduce((max, cur) => Math.max(max, cur), 0);
+            }
+
+            number_of_samples_in_histogram(hist, sample_size = 1) {
+                const total = hist.reduce((value, acc) => value + acc, 0);
+                return Math.round(total / sample_size);
+            }
+
+            remove_low_signal(hist, signal = 0.001) {
+                const nos = this.number_of_samples_in_histogram(hist);
+                const threshold = nos * signal;
+                return hist.map(x => {
+                    if (x < threshold) {
+                        return 0;
+                    } else {
+                        return x;
+                    }
+                })
+            }
+
+            draw_histogram_hsv_all(histograms, canvas2d) {
+                const p = this.properties[0];
+                const blur_size = p.value_of('histogram/blur');
+                const blur_times = p.value_of('histogram/blur_times');
+                const colors = ["hue", "saturation", "luminosity"];
+                // console.log(message.pixel_count);
+                colors.forEach((color, index) => {
+                    let hist = histograms[index];
+                    hist = blur(hist, blur_size, (index === 0), blur_times);
+                    const max = this.max_of_histogram(hist);
+                    this.draw_histogram_hsv(hist, colors[index], max, canvas2d);
+
+                });
+            }
+
+            normalize_histogram(hist) {
+                const max = hist.reduce((max, cur) => Math.max(max, cur), 0);
+                if (max === 0) {
+                    return filled_array(hist.length, 0);
+                }
+                return hist.map(x => x / max);
+            }
+
+            normalize(value, max) {
+                if (max === 0) {
+                    return 0;
+                }
+                return value / max;
             }
 
 
-            on_message_balls(message) {
+            task_balls(message) {
                 this.update_canvas_size(message.resolution[0], message.resolution[1]);
                 //wrap balls up in simple object
                 this.balls = message.balls.map(b => {
@@ -253,22 +636,32 @@
                     };
                 });
 
-                this.canvas2d.clear();
-                this.draw_balls();
-                if(this.is_sampling_colour) {
-                    if(this.lastHSVHistogram) {
-                        const colors = [0, 1,2];
-                        colors.forEach((color, index) => {
-                            const hist = this.lastHSVHistogram.histogram_hsv[index];
-                            this.draw_histogram_hsv(hist, colors[index], this.lastHSVHistogram.pixel_count);
+            }
 
-                        })
-                    }
+            task_sample(message) {
+                if (message.event === 'colour') {
+                    console.log(message.hsv)
+                }
+                else if (message.event === 'histogram') {
+                    this.lastHistogram = message;
+                }
+                else if (message.event === 'histogram_hsv') {
+                    this.lastHSVHistogram = message;
+                    this.hsv_hist.hue.addSample(message.histogram_hsv[0]);
+                    this.hsv_hist.saturation.addSample(message.histogram_hsv[1]);
+                    this.hsv_hist.luminosity.addSample(message.histogram_hsv[2]);
+
                 }
             }
 
-            on_message_frame(message) {
-                //console.log("image_received");
+            task_track(message) {
+                //let hist = message.histogram_hsv;
+                //console.log(message.ball);
+                this.histogramTrackCanvas.clear();
+                this.draw_histogram_hsv_all(message.histogram_hsv, this.histogramTrackCanvas);
+            }
+
+            task_frame(message) {
                 let src = false;
                 if (message.image.format === "jpg") {
                     src = 'data:image/jpg;base64,' + message.image.data;
@@ -277,34 +670,9 @@
                     src = 'data:image/png;base64,' + message.image.data;
                 }
                 if (src !== false) {
-                    this.img.src = src;
-                }
-                this.is_grabbing_frame = false;
-            }
-
-            on_message_sample(message) {
-                if(message.event === 'colour') {
-                    console.log(message.hsv)
-                }
-                else if(message.event === 'histogram') {
-                    console.log(message.histogram);
-                    const colors = [[0,0,255], [0,255,0],[255,0,0]];
-                    colors.forEach((color, index) => {
-                        const hist = message.histogram[index];
-                        this.draw_histogram(hist, colors[index], message.pixel_count);
-
-                    })
-                }
-                else if(message.event === 'histogram_hsv') {
-                    this.lastHSVHistogram = message;
-                    //console.log(message.histogram_hsv);
-                    const colors = [0, 1,2];
-                   // console.log(message.pixel_count);
-                    colors.forEach((color, index) => {
-                        const hist = message.histogram_hsv[index];
-                        this.draw_histogram_hsv(hist, colors[index], message.pixel_count);
-
-                    })
+                    this.frame = new Image();
+                    this.frame.addEventListener("load", () => this.imageUpdated(), false);
+                    this.frame.src = src;
                 }
             }
 
@@ -332,79 +700,187 @@
                 }
             }
 
-            draw_histogram(histogram , colour, pixel_count) {
-                for (let index = 0; index < histogram.length-1; index++) {
-                    this.canvas2d.line(
+            draw_histogram(histogram, colour, pixel_count) {
+                for (let index = 0; index < histogram.length - 1; index++) {
+                    this.histogramCanvas.line(
                         index, this.hist_map((histogram[index] / pixel_count)),
-                        index+1, this.hist_map(histogram[index+1] / pixel_count),
+                        index + 1, this.hist_map(histogram[index + 1] / pixel_count),
                         colour
-
                     )
 
                 }
             }
 
-            draw_histogram_hsv(histogram , colour, pixel_count) {
-                for (let index = 0; index < histogram.length-1; index++) {
-                    let col = [0,255,0];
-                    if (colour === 0) { //HUE
-                        const hue = (index * 2) / 360.0;
-                        col = this.hslToRgb(hue, 1.0, 0.5);
-                    } else if (colour === 1) {
 
-                    } else if (colour === 2) {
-                        const lum = Math.round((histogram[index] / pixel_count) * 255.0);
-                        col = [lum, lum, lum]
+            draw_histogram_hsv(histogram, colour, max_value, canvas2d) {
+                const maxima_range = this.properties[0].value_of('histogram/maxima_range');
+                const maxima_threshold = this.properties[0].value_of('histogram/maxima_threshold');
+                const signal_minimum = this.properties[0].value_of('histogram/signal_minimum');
+                let spec = 0;
+                if (colour === "hue") { //HUE
+                } else if (colour === "saturation") {
+                    spec = 1;
+                } else if (colour === "luminosity") {
+                    spec = 2;
+                }
+
+
+                const h3 = Math.floor(canvas2d.height() / 3.0);
+
+                const y_offset = (spec + 1) * h3;
+
+                let result = null;
+
+                for (let index = 0; index < histogram.length - 1; index++) {
+                    let col = [200, 200, 200];
+
+                    if (colour === "hue") { //HUE
+                        const hue = (index * 2) / 360.0;
+                        col = hslToRgb(hue, 1.0, 0.5);
+                    } else if (colour === "saturation") {
+
+                    } else if (colour === "luminosity") {
+                        col = [index / 1.5 + 63, index / 1.5 + 63, index / 1.5 + 63];
+                    }
+                    // console.log(h3+' '+y_offset);
+                    canvas2d.line(
+                        index * 2, y_offset - (Math.round((histogram[index] / max_value) * h3)),
+                        (index + 1) * 2, y_offset - (Math.round((histogram[index + 1] / max_value) * h3)),
+                        col
+                    )
+                }
+
+
+                //const extrema2 = findLocalMaxima(histogram, 10);
+                const maxima = findLocalMaxima(histogram, maxima_range, colour === "hue");
+                if (maxima !== null) {
+                    maxima.forEach(index => {
+                        const y_offset = (spec + 1) * h3;
+                        let normal_val = (histogram[index] / max_value);
+                        normal_val = 0.5;
+                        canvas2d.line(
+                            index * 2, y_offset,
+                            index * 2, y_offset - (Math.round(normal_val * h3)),
+                            [64, 255, 64]
+                        )
+                    });
+                    let valid_maxima = maxima.filter(index => {
+                        let value = histogram[index];
+                        let normalized_value = this.normalize(value, max_value);
+                        return (normalized_value > maxima_threshold);
+                    });
+
+                    //draw maxima
+                    valid_maxima.forEach(index => {
+                        const y_offset = (spec + 1) * h3;
+                        canvas2d.line(
+                            index * 2, y_offset,
+                            index * 2, y_offset - (Math.round((histogram[index] / max_value) * h3)),
+                            [255, 128, 128]
+                        )
+                    });
+
+                    if (valid_maxima.length !== 0) {
+                        //seek left from lowest maxima
+                        let index = valid_maxima[0];
+                        while (index >= 0) {
+                            let norm_value = this.normalize(histogram[index], max_value);
+                            if (norm_value < signal_minimum) {
+                                break;
+                            }
+                            index--;
+                        }
+                        let left_index = index;
+
+                        //seek rigth from highest maxima
+                        index = valid_maxima[valid_maxima.length - 1];
+                        while (index < histogram.length) {
+                            let norm_value = this.normalize(histogram[index], max_value);
+                            if (norm_value < signal_minimum) {
+                                break;
+                            }
+                            index++;
+                        }
+
+
+                        let right_index = index;
+                        canvas2d.line(
+                            left_index * 2, y_offset - 1,
+                            right_index * 2, y_offset - 1,
+                            [255, 0, 0]
+                        );
+                        const spread = right_index - left_index;
+
+
+                        let scale = 1 / 256.0;
+                        let ok = false;
+                        if (colour === "hue") {
+                            scale = 2;
+
+                            if (valid_maxima.length === 1) {
+                                if ((spread / 180) < 0.1) {  //10 percent max of total width
+                                    ok = true;
+                                }
+                            }
+                        } else if (colour === "saturation") {
+                            if ((left_index / 255.0) > 0.35) {
+                                if ((right_index / 255.0) < 0.98) {
+
+                                    ok = true;
+                                }
+
+                            }
+
+
+                        } else if (colour === "luminosity") {
+                            if ((left_index / 255.0) > 0.10) {
+                                // if ((right_index / 255.0) < 0.98) {
+
+                                ok = true;
+                                // }
+
+                            }
+
+
+                        }
+
+
+                        result = {
+                            left: left_index * scale,
+                            right: right_index * scale,
+                            maxima_count: valid_maxima.length,
+                            ok: ok
+                        };
+                        canvas2d.text(5, y_offset - h3 + 45, colour + ": " + (left_index * scale).toFixed(2) + ' -> ' + (right_index * scale).toFixed(2) + ' m:' + valid_maxima.length + ' v:' + ok);
+
+
+                    } else {
+                        canvas2d.text(5, y_offset - h3 + 45, colour + ": no valid maxima/:" + maxima.length);
+
+
                     }
 
-                    this.canvas2d.line(
-                        index, this.hist_map(histogram[index] / pixel_count ),
-                        index+1, this.hist_map(histogram[index+1] / pixel_count),
-                        col
-
-                    )
 
                 }
+                // console.log(maxima);
+
+                return result;
+
+
             }
 
             hist_map(value) {
-                const h = this.canvas2d.height();
+                const h = this.histogramCanvas.height();
                 return h - Math.round(value * h);
             }
 
-            hslToRgb(h, s, l){
-                let r, g, b;
 
-                if(s === 0){
-                    r = g = b = l; // achromatic
-                }else{
-                    let hue2rgb = function hue2rgb(p, q, t){
-                        if(t < 0) t += 1;
-                        if(t > 1) t -= 1;
-                        if(t < 1/6) return p + (q - p) * 6 * t;
-                        if(t < 1/2) return q;
-                        if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                        return p;
-                    };
-
-                    let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                    let p = 2 * l - q;
-                    r = hue2rgb(p, q, h + 1/3);
-                    g = hue2rgb(p, q, h);
-                    b = hue2rgb(p, q, h - 1/3);
-                }
-
-                return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-            }
-
-
-
-            draw_balls() {
-                this.canvas2d.image(this.img);
-                this.balls.forEach(ball => {
-                    this.canvas2d.circle(ball.x, ball.y, ball.radius, ball.colour)
-                });
-            }
+            // draw_balls() {
+            //     this.canvas2d.image(this.img);
+            //     this.balls.forEach(ball => {
+            //         this.canvas2d.circle(ball.x, ball.y, ball.radius, ball.colour)
+            //     });
+            // }
 
             toggle_ui() {
                 this.show_ui = !this.show_ui;
@@ -412,6 +888,7 @@
             }
 
             update_show_ui() {
+                console.log('sending show_ui')
                 this.send_message("show_ui", {"value": this.show_ui});
             }
 
@@ -419,13 +896,13 @@
                 this.send_message("stabilize", {"frames": 30});
             }
 
-            update_prop(path, value) {
+            send_property_update(path, value) {
                 this.send_message('prop', {'path': path, 'value': value});
             }
 
             send_message(type, message = {}) {
                 message.type = type;
-                console.log('sending '+message.type);
+                //  console.log('sending ' + message.type);
                 this.send_json(message);
             }
 
@@ -437,53 +914,88 @@
                 return ' id="' + this.id_extra(extra) + '" ';
             }
 
+            track_colour() {
+                let value = this.get_selected_colour();
+                if (value === null) {
+                    return;
+                }
+                this.send_tasks_per_frame('track','track_hsv','stop');
+                this.send_tasks_per_frame('track','track_hsv','start',{colour:value});
+
+            }
+
+            get_selected_colour() {
+                let radios = document.getElementsByTagName('input');
+                let value = null;
+                for (let i = 0; i < radios.length; i++) {
+                    if (radios[i].type === 'radio' && radios[i].name === this.id_extra('colors') && radios[i].checked) {
+                        // get value, set checked flag or do whatever you need to
+                        value = radios[i].value;
+                    }
+                }
+                return value;
+            }
+
+
+            apply_colour() {
+
+                let value = this.get_selected_colour();
+                if (value === null) {
+                    return;
+                }
+                if (this.lastColourResult !== null) {
+                    console.log(this.lastColourResult);
+                    const colorpath = "colours/" + value + "/";
+                    let min_huer = this.lastColourResult['hue']['left'];
+                    if (min_huer < 0) {
+                        min_huer = 0;
+                    }
+
+
+                    this.coloured_ball_tracker_properties.set_value_of(colorpath + "min_hsv",
+                        [min_huer, this.lastColourResult['saturation']['left'], this.lastColourResult['luminosity']['left']], true);
+                    this.coloured_ball_tracker_properties.set_value_of(colorpath + "max_hsv",
+                        [this.lastColourResult['hue']['right'], this.lastColourResult['saturation']['right'], this.lastColourResult['luminosity']['right']], true);
+                    this.properties_ui.update();
+                    this.properties_ui.trigger_notification(colorpath + "min_hsv");
+                    this.properties_ui.trigger_notification(colorpath + "max_hsv");
+
+
+                }
+
+            }
+
+            //<input type="radio" name="gender" value="male" checked> Male<br>
+            //<input type="radio" name="gender" value="female"> Female<br>
+            // <input type="radio" name="gender" value="other"> Other
             setup_dom(parent_element) {
-                //  this.parent_element = document.getElementById(parent_id);
                 this.element = document.createElement("div");
                 this.element.id = this.id_extra('');
                 const html = '<div>' +
                     '<canvas ' + this.id_as_html('canvas') + '></canvas>' +
-                    '<img ' + this.id_as_html('img') + '>' +
+
                     '</div>' +
                     '<div>' +
                     '<button ' + this.id_as_html('toggle_ui') + '>Toggle UI</button>' +
                     '<input type="text" value="127.0.0.1"' + this.id_as_html('ip') + '>' +
                     '<button ' + this.id_as_html('connect') + '>Connect</button>' +
                     '<button ' + this.id_as_html('stabilize') + '>Stabilize</button>' +
+                    '<input type="radio" name="' + this.id_extra('colors') + '" value="blue" >Blue</input>' +
+                    '<input type="radio" name="' + this.id_extra('colors') + '" value="orange" >orange</input>' +
+                    '<input type="radio" name="' + this.id_extra('colors') + '" value="green" >green</input>' +
+                    '<input type="radio" name="' + this.id_extra('colors') + '" value="yellow" >yellow</input>' +
+                    '<input type="radio" name="' + this.id_extra('colors') + '" value="pink" >pink</input>' +
+                    '<button ' + this.id_as_html('apply') + '>Apply Colours</button>' +
+                    '<button ' + this.id_as_html('track') + '>Track Colour</button>' +
+                    '</div>' +
+                    '<canvas ' + this.id_as_html('histogram') + '></canvas>' +
+                    '<canvas ' + this.id_as_html('histogram2') + '></canvas>' +
+                    '<canvas ' + this.id_as_html('histogram_track') + '></canvas>' +
+
                     '</div>';
                 this.element.innerHTML = html;
-               // this.setup_prop_slider('Blur', 'tracker/blur', this.element);
-               // this.setup_prop_slider('Quality', 'frame/quality', this.element);
-
                 parent_element.appendChild(this.element);
             }
-
-           /* setup_prop_slider(label, prop_path, parent_element) {
-                let wrap = document.createElement("div");
-                let html = '<div>' + label + '<div ' + this.id_as_html(prop_path) + '></div></div>';
-                wrap.innerHTML = html;
-                parent_element.appendChild(wrap);
-
-            }
-
-            connect_prop_slider(prop_path) {
-                let id = this.id_extra(prop_path);
-                let slider = document.getElementById(id);
-                noUiSlider.create(slider, {
-                    start: [0],
-                    connect: true,
-                    step: 1,
-                    range: {
-                        'min': 0,
-                        'max': 100
-                    }
-                });
-                slider.noUiSlider.on('update', (values, handle) => {
-                 //   this.quality(values[handle]);
-                });
-            }*/
-
-
         }
 
         SoundOfColourServer.id_gen = 0; //stupid ES6.0 doesn't easily support class variables

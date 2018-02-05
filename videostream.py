@@ -2,6 +2,7 @@ from framespersecond import FramesPerSecond
 from threading import Thread
 import time
 import imageprocessing as imageprocessing
+from queue import Queue
 
 
 class VideoStream:
@@ -22,6 +23,10 @@ class VideoStream:
         self.thread = None
         self.thread_should_be_running = False
 
+        self.on_frame_handler = None
+        self.message_q = Queue()
+        self.name = "VideoStream"
+
     def update_stats(self):
         self.frame_count = self.frame_count + 1
         self.frames_per_second.add()
@@ -33,8 +38,10 @@ class VideoStream:
         self.thread = Thread(target=self.update, args=())
         self.thread.daemon = True
         self.thread_should_be_running = True
+        self.thread.name = self.name + " Thread"
         self.thread.start()
-        print("Waiting for Video Stream to initialize:" + str(self.wait_time_after_start) + 's')
+        print(self.name + " Main Loop Thread: " + str(self.thread.ident))
+        # print("Waiting for Video Stream to initialize:" + str(self.wait_time_after_start) + 's')
         time.sleep(self.wait_time_after_start)  # stabilize - recommended practice
         return self
 
@@ -75,11 +82,13 @@ class VideoStream:
             print("Video Stream is already stopped - ignored")
             return
         # stop the thread and release any resources
-        print("stopping video stream...")
+        print("stopping video stream blocking......")
         self.thread_should_be_running = False
         self.thread.join()
+        print('Closed: '+self.name + " Main Loop Thread: " + str(self.thread.ident))
         self.thread = None
-        print("stopped video stream...")
+
+
 
     def set_frame(self, frame, is_new_frame=True):
         if frame is None:
@@ -91,14 +100,26 @@ class VideoStream:
                 print("actual resolution is not same as wanted_resolution, adjusting... " +
                       str(self.actual_resolution) + ' wanted:' + str(self.wanted_resolution))
             self.new_frame_available = True
+            self.notify_new_frame()
             self.update_stats()
             self.update_stabilize()
+
+    def notify_new_frame(self):
+        if self.on_frame_handler is not None:
+            self.on_frame_handler()
+
+        self.message_q.put('frame')
+
+
 
     def flip_horizontal(self):
         raise NotImplementedError
 
     def resolution(self):
         return self.wanted_resolution
+
+    def on_frame(self, handler):
+        self.on_frame_handler = handler
 
     @staticmethod
     def create(wanted_resolution=(320, 240), wanted_frame_rate=32, use_pi_camera=False, open_cv_src=0):
@@ -115,25 +136,44 @@ class VideoStream:
 
 
 if __name__ == '__main__':
-    import cv2
     import sys
+    import signal
+    import threading
+
+
+    should_be_running = True
+
+
+
+    def handler(signum, frame):
+        global should_be_running
+        print("Received SIGNTREM: "+str(signum))
+        should_be_running = False
 
     vs = None
-    try:
-        vs = VideoStream.create()
-        vs.start()
-        while True:
-            new_frame, last_valid_frame, frame_count, resolution = vs.latest()
-            if new_frame is not None:
-                print(" frame: " + str(frame_count) +
-                      ' fps:' + str(vs.frames_per_second.fps) +
-                      ' bounced: ' + str(vs.duplicate_frames_per_second_requests.fps))
+    signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGINT, handler)
 
-            else:
-                pass
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
+    def image_handler():
+        new_frame, last_valid_frame, frame_count, resolution = vs.latest()
+        if new_frame is not None:
+            print("Image received on thread: " + str(threading.current_thread().ident))
+            print(" frame: " + str(frame_count) +
+                  ' fps:' + str(vs.frames_per_second.fps) +
+                  ' bounced: ' + str(vs.duplicate_frames_per_second_requests.fps))
+
+
+    try:
+        print("Starting program on thread: "+str(threading.current_thread().ident))
+        vs = VideoStream.create()
+        vs.on_frame(image_handler)
+        vs.start()
+        while should_be_running:
+            what = str(input("Press Q to stop"))
+            if what.upper() == "Q":
+                should_be_running = False
+
+
     except KeyboardInterrupt:
         print("CRTL + C")
     except:

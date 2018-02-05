@@ -178,8 +178,8 @@ class Property(PropertyNode):
 
         was_changed = temp_value != self.value()
 
-        if self.type == PropNodeType.rgb:
-            print("Prop Set RGB: from: "+str(temp_value)+ "->" + str(self.value()))
+        # if self.type == PropNodeType.rgb:
+            # print("Prop Set RGB: from: "+str(temp_value)+ "->" + str(self.value()))
 
 
         if from_runtime_change:

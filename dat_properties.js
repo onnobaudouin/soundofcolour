@@ -56,6 +56,11 @@ class DatGUIPropertiesView {
         }
     }
     
+    trigger_notification(proppath) {
+        let prop_node = this.properties.node_at_path(proppath);
+        this.notify(prop_node);
+    }
+    
     onChange(prop_node, value) {
         //console.log(prop_node.path().join('/') + ' = '+value);
         switch (prop_node.type) {

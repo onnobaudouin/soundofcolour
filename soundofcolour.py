@@ -1,21 +1,34 @@
 from colouredballtracker import ColouredBallTracker
 from soundofcoloursocketserver import SoundOfColourSocketServer
-import json
 import cv2
 import imageprocessing as imageprocessing
 from properties import *
 import traceback
 import logging
 from functools import reduce
+from collections import OrderedDict
+
+
+class TaskPerFrame:
+    def __init__(self, id, task, data, client=None):
+        self.task = task
+        self.id = id
+        self.data = data
+        self.client = client
+        self.result = None
+
+    def update(self, data):
+        self.data = data
 
 
 class SoundOfColour(PropertiesListener):
     def __init__(self):
         self.tracker = ColouredBallTracker()
-        self.tracker.set_update_handler(lambda x=self: x.on_tracker_update())
-        self.socket_server = None
-        self.ball_count = None
-        self.show_ui = False
+        #  self.tracker.set_update_handler(lambda x=self: x.on_tracker_update())
+        self.tracker.set_frame_handler(lambda y, x=self: x.on_tracker_frame(y))
+
+        self.socket_server = None  # type: SoundOfColourSocketServer
+        # self.show_ui = False
 
         self.properties = Properties('sound-of-colour')
 
@@ -23,18 +36,15 @@ class SoundOfColour(PropertiesListener):
 
         self.message_handlers = dict(
             show_ui=self.on_message_show_ui,
-            frame=self.on_message_frame,
             stabilize=self.on_message_stabilize,
             prop=self.on_message_prop,
             prop_description=self.on_message_prop_description,
             prop_all=self.on_message_prop_all,
             mouse=self.on_message_mouse,
-            request_balls=self.on_message_request_balls,
-            sample=self.on_message_sample
+            tasks_per_frame=self.on_message_tasks_per_frame
         )
 
-        self.clients_requesting_balls = []
-        self.clients_requesting_frames = []  # todo
+        self.tasks_per_frame = OrderedDict()
 
     def on_prop_updated(self, prop: PropertyNode, from_runtime_change: bool = True):
         """
@@ -50,28 +60,112 @@ class SoundOfColour(PropertiesListener):
                 value=prop.contents()
             ))
 
-    def on_tracker_update(self):
+    def on_tracker_frame(self, frame_count):
         """
-        Called by tracker when it gets more information on balls
-        data is PUSHED, not polled.
+        Called by tracker when a new video frame was processed.
+
+        we look at all the tasks (per client) that need to be done and send each client what it needs...
+
+        tasks are setup using the tasks_per_frame message
         :return:
         """
-        self.tracker.show_ui(self.show_ui)
-        balls = self.tracker.balls()
-        self.send_balls_information_to_clients(balls)
-
-    def send_balls_information_to_clients(self, balls):
-        if len(self.clients_requesting_balls) == 0:
+        if len(self.tasks_per_frame) == 0:
+            # print(str(frame_count))
             return
-        ball_info = []
-        for ball in balls:
-            ball_info.append([ball.id, ball.colour.name, int(ball.radius), int(ball.pos[0]), int(ball.pos[1])])
 
-        # only send to those that requested it!!!
-        self.send_to_clients(self.clients_requesting_balls, 'balls', dict(
+        # now we build up all the tasks out clients want us to send / per frame.
+        clients = []
+        for task in list(self.tasks_per_frame.values()):
+            result = None
+            taskname = task.task
+            if taskname == "frame":
+                result = self.task_frame_as_result(task.data, frame_count)
+            elif taskname == "balls":
+                result = self.task_balls_as_result(task.data, frame_count)
+            elif taskname == "sample":
+                result = self.task_sample_as_result(task.data, frame_count)
+            elif taskname == "track":
+                result = self.task_track_as_result(task.data, frame_count)
+            if result is not None:
+                task.result = dict(
+                    task=taskname,
+                    result=result
+                )
+                if task.client not in clients:
+                    clients.append(task.client)
+
+        # collate messages per client...
+        for client in clients:
+            messages = []
+            for task in list(self.tasks_per_frame.values()):
+                if client is task.client:
+                    messages.append(task.result)
+            self.send_to_client(client, _type="tasks_per_frame", message=dict(tasks=messages))
+
+    def task_frame_as_result(self, setup, frame_count):
+        modulus = self.as_int(setup, "modulus", 1)
+        if frame_count % modulus != 0:
+            return
+
+        quality = self.as_int(setup, "quality", 50)
+        ratio = self.as_float(setup, "ratio", 1.0)
+        image_format = self.as_str(setup, "format", "jpg")
+
+        image = imageprocessing.image_as_base64_encoded_image(
+            self.tracker.frame,
+            quality=quality,
+            image_format=image_format, ratio=ratio)
+
+        if image is not None:
+            return dict(
+                image=dict(
+                    data=image,
+                    format=image_format)
+            )
+
+    def task_balls_as_result(self, setup, frame_count):
+        ball_info = [self.ball_to_ball_info(x) for x in self.tracker.balls()]
+        return dict(
             balls=ball_info,
             resolution=list(self.tracker.resolution())
-        ))
+        )
+
+    def ball_to_ball_info(self, ball):
+        return [ball.id, ball.colour.name, int(ball.radius), int(ball.pos[0]), int(ball.pos[1])]
+
+    def task_track_as_result(self, setup, frame_count):
+        colour = setup['colour'];
+        first_match_ball = next((x for x in self.tracker.balls() if x.colour.name == colour), None)
+        if first_match_ball is not None:
+            histogram_hsv = self.tracker.sample_histogram_hsv(
+                int(first_match_ball.pos[0]),
+                int(first_match_ball.pos[1]),
+                int(first_match_ball.radius))
+            return dict(histogram_hsv=histogram_hsv, ball=self.ball_to_ball_info(first_match_ball) )
+        return None
+
+    def task_sample_as_result(self, setup, frame_count):
+
+        width, height = self.tracker.resolution()
+        x = int(width * float(setup['x']))
+        y = int(height * float(setup['y']))
+        radius = int(width * float(setup['radius']))
+
+        event = setup['event']
+        if event == 'colour':
+            hsv = self.tracker.sample_colour(x, y, radius)
+            # print(str(hsv))
+            return dict(hsv=hsv, event=event)
+        elif event == 'histogram':
+            histogram = self.tracker.sample_histogram(x, y, radius)
+            # print(str(histogram))
+            pixel_count = reduce(lambda x, y: x + y, histogram[0])
+            return dict(histogram=histogram, event=event, pixel_count=pixel_count)
+        elif event == 'histogram_hsv':
+            histogram_hsv = self.tracker.sample_histogram_hsv(x, y, radius)
+            # print(str(histogram))
+            pixel_count = reduce(lambda x, y: x + y, histogram_hsv[0])
+            return dict(histogram_hsv=histogram_hsv, event=event, pixel_count=pixel_count)
 
     def dict_to_json(self, message_dict):
         return json.dumps(message_dict, separators=(',', ':'))
@@ -83,11 +177,6 @@ class SoundOfColour(PropertiesListener):
     def send_to_all_clients(self, _type, message):
         self.socket_server.send_to_all(self.create_json_message(_type, message))
 
-    def send_to_clients(self, clients, _type, message):
-        message = self.create_json_message(_type, message)
-        for socket in clients:
-            socket.sendMessage(message)
-
     def send_to_client(self, socket, _type, message):
         socket.sendMessage(self.create_json_message(_type, message))
 
@@ -96,22 +185,17 @@ class SoundOfColour(PropertiesListener):
         self.send_to_client(socket, 'welcome', dict())
 
     def on_client_closed(self, socket):
-        if socket in self.clients_requesting_balls:
-            self.clients_requesting_balls.remove(socket)
+        tasks_to_remove = []
+        for task in list(
+                self.tasks_per_frame.values()):  # this caused threading issues when modifying when iterating...
+            if task.client is socket:
+                tasks_to_remove.append(task.id)
+        print("Client Closing, removing tasks related to client #" + str(len(tasks_to_remove)))
+        for id in tasks_to_remove:
+            self.stop_task(id)
 
     def on_message_show_ui(self, message, socket, type):
-        """
-        Client triggers show_ui.
-        //this is not a property as yet...
-        :param message:
-        :param socket:
-        :param type:
-        :return:
-        """
-        self.show_ui = bool(message["value"])
-
-    def on_message_request_balls(self, message, socket, type):
-        self.clients_requesting_balls.append(socket)
+        self.tracker.show_ui(bool(message["value"]))  # should this be a message that is async?
 
     def on_message_mouse(self, message, socket, type):
         event = message['event']
@@ -125,100 +209,104 @@ class SoundOfColour(PropertiesListener):
             cv2event = cv2.EVENT_MOUSEMOVE
         width, height = self.tracker.resolution()
 
-        print("mouse " + event + " " + str(x) + " " + str(y))
-
+        # we FAKE a mouse event here...
         self.tracker.mouse.handle_event(cv2event, int(width * x), int(height * y), None, None)
 
-    def on_message_sample(self, message, socket, type):
-        event = message['event']
-        if event == 'colour':
-            width, height = self.tracker.resolution()
-            x = int(width * float(message['x']))
-            y = int(height * float(message['y']))
-            radius = int(width * float(message['radius']))
-            hsv = self.tracker.sample_colour(x, y, radius)
-            # print(str(hsv))
-            return dict(hsv=hsv, event=event)
-        elif event == 'histogram':
-            width, height = self.tracker.resolution()
-            x = int(width * float(message['x']))
-            y = int(height * float(message['y']))
-            radius = int(width * float(message['radius']))
-            histogram = self.tracker.sample_histogram(x, y, radius)
-            # print(str(histogram))
-            pixel_count = reduce(lambda x, y: x + y, histogram[0])
-            return dict(histogram=histogram, event=event, pixel_count=pixel_count)
-        elif event == 'histogram_hsv':
-            width, height = self.tracker.resolution()
-            x = int(width * float(message['x']))
-            y = int(height * float(message['y']))
-            radius = int(width * float(message['radius']))
-            histogram_hsv = self.tracker.sample_histogram_hsv(x, y, radius)
-            # print(str(histogram))
-            pixel_count = reduce(lambda x, y: x + y, histogram_hsv[0])
-            return dict(histogram_hsv=histogram_hsv, event=event, pixel_count=pixel_count)
-
-    def on_message_frame(self, message, socket, type):
+    def on_message_tasks_per_frame(self, message, socket, type):
         """
-        Client requests last frame as base64 encoded image...
+        Called to setup/stop/update a task that the server should send after each frame...
+
+        JSON would look like
+
+        {
+            "tasks": [
+                {
+                    "task": "frame",
+                    "id": 458,
+                    "state": "start" | "stop" | "update",
+                    "data" : {
+                       .....
+                    }
+                }
+
+            ]
+        }
+
         :param message:
         :param socket:
         :param type:
         :return:
         """
-        quality = 50
-        if "quality" in message:
-            quality = int(message["quality"])
-        ratio = 1.0
-        if "ratio" in message:
-            ratio = float(message["ratio"])
-        image_format = "jpg"
-        if "format" in message:
-            image_format = str(message["format"])
+        tasks = message['tasks']
+        for task_info in tasks:
+            state = task_info['state']  # state
+            id = task_info['id']  # must be globally unique
+            if state == 'start':
+                if id in self.tasks_per_frame:
+                    print("cannot start a task per frame that is already running")
+                    return
+                task = TaskPerFrame(id, task_info['task'], task_info['data'], client=socket)
+                print("starting task " + str(task_info['task']))
+                self.tasks_per_frame[id] = task
+            elif state == 'stop':
+                self.stop_task(id)
 
-        image = imageprocessing.image_as_base64_encoded_image(
-            self.tracker.last_frame,
-            quality=quality,
-            image_format=image_format, ratio=ratio)
+            elif state == 'update':
+                if id not in self.tasks_per_frame:
+                    print("cannot update a task per frame that is already running")
+                    return
+                # print("update task " + str(task_info['task']))
+                self.tasks_per_frame[id].update(task_info['data'])
 
-        if image is not None:
-            return dict(
-                image=dict(
-                    data=image,
-                    format=image_format)
-            )
+    def stop_task(self, id):
+        if id not in self.tasks_per_frame:
+            print("cannot stop a task per frame that is not running")
+            return
+        task = self.tasks_per_frame[id]
+        print("stop task " + task.task)
+        self.tasks_per_frame.pop(id)
+
+    # def on_message_sample(self, message, socket, type):
+
+    def get_prop(self, obj=None, key=None, ):
+        if obj is None:
+            return None
+        if key is None:
+            return None
+        if key in obj:
+            return obj[key]
+        return None
+
+    def as_int(self, obj=None, key=None, default=None):
+        val = self.get_prop(obj, key)
+        if val is None:
+            return default
+        return int(val)
+
+    def as_float(self, obj=None, key=None, default=None):
+        val = self.get_prop(obj, key)
+        if val is None:
+            return default
+        return float(val)
+
+    def as_str(self, obj=None, key=None, default=None):
+        val = self.get_prop(obj, key)
+        if val is None:
+            return default
+        return str(val)
+
+    # def frame_as_message(self, quality: int = 50, ratio: float = 1.0, image_format: str = "jpg"):
 
     def on_message_stabilize(self, message, socket, type):
-        """
-        Client requests to start stabilizing image
-        :param message:
-        :param socket:
-        :param type:
-        :return:
-        """
         self.tracker.state.start("stabilize")
 
     def on_message_prop(self, message, socket, type):
-        """
-        Client set a value of a property...
-        :param message:
-        :param socket:
-        :param type:
-        :return:
-        """
         prop_path = message["path"]
         prop_value = message["value"]
         print("prop " + str(socket.data))
         self.tracker.properties.set_value_of(prop_path, value=prop_value, from_run_time=True)
 
     def on_message_prop_description(self, message, socket, type):
-        """
-        Client requests the properties this server holds. i.e. it's property API...
-        :param message:
-        :param socket:
-        :param type:
-        :return:
-        """
         used_props = (self.tracker.properties, self.properties)
         description = collections.OrderedDict()
         for prop in used_props:
@@ -227,13 +315,6 @@ class SoundOfColour(PropertiesListener):
         return description
 
     def on_message_prop_all(self, message, socket, type):
-        """
-        Client requests all the propery values for a specif property set...
-        :param message:
-        :param socket:
-        :param type:
-        :return:
-        """
         which_prop = message['properties_name']
         p = None
         if which_prop == "coloured_ball_tracker":
@@ -276,27 +357,32 @@ class SoundOfColour(PropertiesListener):
     def run(self):
         try:
             self.tracker.start()
+
             self.socket_server = SoundOfColourSocketServer(port=8001)
             self.socket_server.set_on_client_connected(lambda socket, x=self: x.on_client_connected(socket))
             self.socket_server.set_on_client_message(lambda socket, x=self: x.on_client_message(socket))
             self.socket_server.set_on_client_closed(lambda socket, x=self: x.on_client_closed(socket))
             while True:
-                self.socket_server.serveonce()  # this is slow.... move to server
-                if self.tracker.is_thread_running() is False:
-                    print("ColouredBallTracker was shut down by itself - closing whole program")
+                # todo combine all events that need to occur on Main thread into a single Queue or other mechanism
+                self.socket_server.serveonce()  # handle all socket server events
+                if self.tracker.perform_main_thread_events_and_check_if_need_to_quit():  # handle all tracker event, including UI.
                     break
 
         except KeyboardInterrupt:
             print("CRTL + C -> starting to stop tracker...")
             pass
-        except SystemExit:
-            print("System Exit Called...")
-            pass
-        finally:
-            self.tracker.stop_and_wait_until_stopped()
-            self.socket_server.close()
+
+        print("Closing socket server...")
+        self.socket_server.close()
+
+        print("Closing Coloured Ball Tracker...")
+        self.tracker.stop_and_wait_until_stopped()
+
+
 
 
 if __name__ == '__main__':
+
     soc = SoundOfColour()
     soc.run()
+

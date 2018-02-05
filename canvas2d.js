@@ -91,6 +91,14 @@ class Canvas2D {
         this.ctx.fill();
     }
     
+    text(x, y, text, colour=[255,255,255], size=12, font="Arial") {
+        if (!this.ready()) return; //todo implement as empty functions?
+        this.ctx.font = size+"px "+font;
+        this.ctx.fillStyle = 'rgb('+colour.join(',')+')';
+        this.ctx.fillText(text, x, y);
+        
+    }
+    
     circle(x, y, radius, colour) {
         if (!this.ready()) return; //todo implement as empty functions?
         this.ctx.beginPath();

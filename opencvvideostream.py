@@ -14,6 +14,8 @@ class OpenCVVideoStream(VideoStream):
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.stream.set(cv2.CAP_PROP_FPS, wanted_frame_rate)  # doesn't work on web cam
 
+        self.name = "OpenCVVideoStream"
+
     def update(self):
         while self.thread_should_be_running:
             # otherwise, read the next frame from the stream

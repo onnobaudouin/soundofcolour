@@ -1,5 +1,7 @@
 from simplewebsocketserver import SimpleWebSocketServer, WebSocket
 import time
+import traceback
+import logging
 
 
 class SoundOfColourSocket(WebSocket):
@@ -18,8 +20,12 @@ class SoundOfColourSocket(WebSocket):
 
     def handleClose(self):
         print(self.address, 'closed')
-        self.server.clients.remove(self)
-        self.server.handle_closed(self)
+        try:
+            self.server.clients.remove(self)
+            self.server.handle_closed(self)
+        except Exception as ex:
+            logging.error(traceback.format_exc())
+
 
         # for client in self.server.clients:
         #    client.sendMessage(self.address[0] + u' - disconnected')
@@ -51,7 +57,7 @@ class SoundOfColourSocketServer(SimpleWebSocketServer):
 
     def handle_socket_event(self, handler, socket):
         if handler is not None:
-           handler(socket)
+            handler(socket)
 
     def handle_connected(self, socket):
         self.handle_socket_event(self.client_connected_handler, socket)

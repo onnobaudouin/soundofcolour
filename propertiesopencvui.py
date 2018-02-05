@@ -1,5 +1,7 @@
 from properties import *
 import cv2
+import traceback
+import logging
 
 
 class PropertyUIOpenCV:
@@ -96,6 +98,25 @@ class PropertyUIHSVOpenCV(PropertyUIMultipleOpenCV):
         return int(ui_value[0]), float(ui_value[1]) / 255.0, float(ui_value[2]) / 255.0
 
 
+class PropertyUIUnsignedFloatOpenCV(PropertyUIOpenCV):
+    def __init__(self, window_name: str, prop: Property):
+        self.ui_range = 255
+        self.value_range = prop.max - prop.min
+        super().__init__(window_name, prop)
+
+    def prop_to_ui(self, prop_value):
+        t = prop_value - self.prop.min
+        p = t / self.value_range
+        return int(p * self.ui_range)
+
+    def ui_to_prop(self, ui_value):
+        p = float(ui_value) / float(self.ui_range)
+        v = p * self.value_range
+        v = v + self.prop.min
+        print(self.name + ': '+str(v))
+        return v
+
+
 class PropertiesOpenCVUI(PropertiesListener):
     def __init__(self, properties_obj):
         self.properties = properties_obj
@@ -103,7 +124,10 @@ class PropertiesOpenCVUI(PropertiesListener):
         self.properties_uis = dict()
 
     def close(self):
-        cv2.destroyAllWindows()
+        try:
+            cv2.destroyAllWindows()
+        except Exception as ex:
+            logging.error(traceback.format_exc())
         self.properties_uis = dict()
 
     def show(self, node_path: str):
@@ -135,6 +159,8 @@ class PropertiesOpenCVUI(PropertiesListener):
             return PropertyUIRGBOpenCV(window_name, prop)
         elif prop.type == PropNodeType.hsv:
             return PropertyUIHSVOpenCV(window_name, prop)
+        elif prop.type == PropNodeType.unsigned_float:
+            return PropertyUIUnsignedFloatOpenCV(window_name, prop)
         else:
             return PropertyUIOpenCV(window_name, prop)
 

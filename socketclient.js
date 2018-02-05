@@ -76,17 +76,19 @@ class SocketClient {
     }
     
     connect_handlers() {
-        this.websocket.addEventListener('open', this.openHandler);
-        this.websocket.addEventListener('close', this.closeHandler);
-        this.websocket.addEventListener('message', this.messageHandler);
-        this.websocket.addEventListener('error', this.errorHandler);
+        let ws  = this.websocket;
+        ws.addEventListener('open', this.openHandler);
+        ws.addEventListener('close', this.closeHandler);
+        ws.addEventListener('message', this.messageHandler);
+        ws.addEventListener('error', this.errorHandler);
     }
     
     disconnect_handlers() {
-        this.websocket.removeEventListener('open', this.openHandler);
-        this.websocket.removeEventListener('close', this.closeHandler);
-        this.websocket.removeEventListener('message', this.messageHandler);
-        this.websocket.removeEventListener('error', this.errorHandler);
+        let ws  = this.websocket;
+        ws.removeEventListener('open', this.openHandler);
+        ws.removeEventListener('close', this.closeHandler);
+        ws.removeEventListener('message', this.messageHandler);
+        ws.removeEventListener('error', this.errorHandler);
     }
     
     send_raw(message) {

@@ -5,3 +5,5 @@ class TrackedColour:
         self.maximum_hsv = maximum_hsv
         self.mask = None
         self.rgb = rgb
+        self.min_values = None
+        self.max_values = None
