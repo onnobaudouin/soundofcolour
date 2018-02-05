@@ -1,5 +1,5 @@
 import sys
-from python.trackedball import TrackedBall
+from trackedball import TrackedBall
 
 
 class BallTracker:

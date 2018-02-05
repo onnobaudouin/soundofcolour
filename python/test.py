@@ -2,16 +2,16 @@ import cv2
 import sys
 from hardware import *
 import mouseinteraction as mouse
-from python.trackedcolour import TrackedColour
+from trackedcolour import TrackedColour
 import opencvhelpers as cvh
 from framespersecond import FramesPerSecond
 import time
-from python.videostream import VideoStream
+from videostream import VideoStream
 from balltracker import BallTracker
 from OctaveGrid import OctaveGrid
-from python.soundsocketserver import SoundSocketServer
+from soundsocketserver import SoundSocketServer
 from simplewebserver import *
-from python.web import *
+from web import *
 from propertiesopencvui import *
 
 

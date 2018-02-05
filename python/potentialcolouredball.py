@@ -53,6 +53,8 @@ class PotentialColouredBall:
 
         PotentialColouredBall.draw_many(draw_frame, circles, (255, 128, 128), 2)
 
+        return circles
+
     @staticmethod
     def combined_clustered_circles(
             circles: List["PotentialColouredBall"],

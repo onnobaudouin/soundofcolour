@@ -1,5 +1,5 @@
 from colouredballtracker import ColouredBallTracker
-from python.soundofcoloursocketserver import SoundOfColourSocketServer
+from soundofcoloursocketserver import SoundOfColourSocketServer
 import cv2
 import imageprocessing as imageprocessing
 from properties import *

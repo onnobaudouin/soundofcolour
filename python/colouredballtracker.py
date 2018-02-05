@@ -3,12 +3,12 @@ from mouseinteraction import MouseInteraction
 from framespersecond import FramesPerSecond
 import threading
 from threading import Thread
-from python.videostream import VideoStream
+from videostream import VideoStream
 from balltracker import BallTracker
 from propertiesopencvui import *
-from python.trackedball import TrackedBall
-from python.trackedcolour import TrackedColour
-from python.stateengine import *
+from trackedball import TrackedBall
+from trackedcolour import TrackedColour
+from stateengine import *
 import imageprocessing as imageprocessing
 import traceback
 import logging
@@ -113,9 +113,9 @@ class ColouredBallTracker(object):
     def load_properties(self, filename: str = None):
         if filename is None:
             if self.IS_RUNNING_ON_PI:
-                filename = "pi.json"
+                filename = "../pi.json"
             else:
-                filename = "onno.json"
+                filename = "../onno.json"
         self.properties.load(filename)
 
     def show_properties(self):

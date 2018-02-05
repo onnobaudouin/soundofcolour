@@ -11,6 +11,7 @@ class JSONFile:
             with open(filename) as data_file:
                 data = json.load(data_file)
 
+
             return data
         except:
             print("Unexpected error:", sys.exc_info()[0])
