@@ -65,13 +65,19 @@ open a terminal and update OS to the latest libraries etc.
 
 Full instructions: https://www.raspberrypi.org/documentation/installation/installing-images/README.md    
 
-
     sudo apt-get purge wolfram-engine
     sudo apt-get purge libreoffice*
     sudo apt-get clean
     sudo apt-get autoremove
     
     sudo apt-get update && sudo apt-get upgrade
+    
+Also we need to enable the pi camera in raspi_config.
+
+    sudo raspi-config 
+    
+Enable camera and SSH and reboot or type manually...        
+    
     sudo reboot 
 
 
@@ -113,7 +119,7 @@ https://www.pyimagesearch.com/2017/10/09/optimizing-opencv-on-the-raspberry-pi/
     
     nano ~/.profile
     
-Then add these lines at the end:
+Then add these lines at the end: ~/.profile
 
     # virtualenv and virtualenvwrapper
     export WORKON_HOME=$HOME/.virtualenvs
@@ -141,7 +147,7 @@ Now we optimize the compilation by creating a bigger swapfile
 
     sudo nano /etc/dphys-swapfile
     
-End change to 1024
+End change to 1024 /etc/dphys-swapfile
 
     CONF_SWAPSIZE=1024            
     
@@ -161,7 +167,7 @@ Reduce swapfile
 
     sudo nano /etc/dphys-swapfile
     
-End change to 100
+End change to 100 /etc/dphys-swapfile
 
     CONF_SWAPSIZE=100            
     
@@ -177,10 +183,105 @@ Now make sure the virtualenv (cv) can use opencv
     cd ~/.virtualenvs/cv/lib/python3.5/site-packages/
     ln -s /usr/local/lib/python3.5/site-packages/cv2.so cv2.so
     
-    
+#### PiCamera
+
+Still in your cv env:
+
+    pip install picamera
+
+
  
  
 #### Sound of colour
 
 
 git clone https://username:password@github.com/MediaInnovationStudio/soundofcolour
+
+https://opgbaudouin@github.com/MediaInnovationStudio/soundofcolour
+#### Setup the PI as access point
+
+We will set this up with 
+
+SSID = SoundOfColour
+PASS = asdfvbnm
+
+It's a G-Only network and WPA2 PSK. If your device doesn't support this -> no luck.
+
+Note: when now using the Desktop
+
+https://www.raspberrypi.org/documentation/configuration/wireless/access-point.md
+
+    sudo apt-get install dnsmasq hostapd
+    sudo systemctl stop dnsmasq
+    sudo systemctl stop hostapd
+    
+    sudo nano /etc/dhcpcd.conf
+    
+Now edit the file /etc/dhcpcd.conf
+
+    interface wlan0
+    static ip_address=192.168.20.1/24    
+    
+Save and close
+
+    sudo systemctl restart dhcpcd
+    sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig  
+    sudo nano /etc/dnsmasq.conf 
+
+Write the NEW file /etc/dnsmasq.conf 
+
+    interface=wlan0     
+    dhcp-range=192.168.20.68,192.168.4.168,255.255.255.0,24h  
+    
+    sudo nano /etc/hostapd.conf 
+    
+Write the NEW file  /etc/hostapd.conf 
+    
+    interface=wlan0
+    driver=nl80211
+    ssid=NameOfNetwork
+    hw_mode=g
+    channel=7
+    wmm_enabled=0
+    macaddr_acl=0
+    auth_algs=1
+    ignore_broadcast_ssid=0
+    wpa=2
+    wpa_passphrase=AardvarkBadgerHedgehog
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=TKIP
+    rsn_pairwise=CCMP    
+    
+Then
+   
+    sudo nano /etc/default/hostapd
+    
+and edit file:  /etc/default/hostapd
+
+    DAEMON_CONF="/etc/hostapd.conf"   
+    
+Then
+    
+    sudo systemctl start hostapd
+    sudo systemctl start dnsmasq      
+    
+    sudo nano /etc/sysctl.conf
+    
+Edit
+
+    net.ipv4.ip_forward=1
+    
+Save and Quit
+
+    sudo iptables -t nat -A  POSTROUTING -o eth0 -j MASQUERADE
+    sudo sh -c "iptables-save > /etc/iptables.ipv4.nat"
+      
+    sudo /etc/rc.local
+    
+Edit file (just above the exit 0)
+
+    iptables-restore < /etc/iptables.ipv4.nat
+    
+    sudo reboot
+    
+### TODO VNC for debugging?                   
