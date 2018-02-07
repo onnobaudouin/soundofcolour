@@ -30,6 +30,12 @@ class VideoStream:
     def update_stats(self):
         self.frame_count = self.frame_count + 1
         self.frames_per_second.add()
+        
+    def print_stats(self):
+         print(" frame: " + str(self.frame_count) +
+                      ' fps:' + str(self.frames_per_second.fps) +
+                      ' bounced: ' + str(self.duplicate_frames_per_second_requests.fps) + 
+                      ' res: ' + str(self.actual_resolution))    
 
     def start(self):
         if self.thread is not None:
@@ -93,6 +99,7 @@ class VideoStream:
     def set_frame(self, frame, is_new_frame=True):
         if frame is None:
             print("Error a frame was set to None")
+            pass
         else:
             self.frame = frame
             self.actual_resolution = imageprocessing.resolution_of(frame)
@@ -165,7 +172,7 @@ if __name__ == '__main__':
 
     try:
         print("Starting program on thread: "+str(threading.current_thread().ident))
-        vs = VideoStream.create()
+        vs = VideoStream.create('VGA', 30, True)
         vs.on_frame(image_handler)
         vs.start()
         while should_be_running:

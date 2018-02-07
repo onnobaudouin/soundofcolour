@@ -13,7 +13,7 @@ class PotentialColouredBall:
     hue = None
     range = None
     meaningfull_maxima = None
-    blurred_hist = None
+    blurred_hists = None
     greyness = None
 
     def __init__(self, circle):
@@ -29,7 +29,7 @@ class PotentialColouredBall:
         self.hue = hue
         self.range = hue_range
         self.meaningfull_maxima = meaningfull_maxima
-        self.blurred_hist = blurred_hists
+        self.blurred_hists = blurred_hists
         self.greyness = greyness
 
     def update_statistics(self, circle, hsv_frame, rgb_frame, draw_frame, debug=True):
@@ -230,10 +230,11 @@ class PotentialColouredBall:
         # imageprocessing.draw_histogram(draw_frame, (x , y), coldif, scale=50, normalize=True, colour=(128,255,255))
 
         expected = [
-            (120, 160, "green", 10),
+            (80, 160, "green", 10),
             (316, 350, "pink", 8),
             (208, 225, "blue", 8),
-            (55, 75, "yellow", 8)]
+            (55, 75, "yellow", 8),
+            (10, 35, "orange", 8)]
 
         color = None
         range = None
@@ -260,4 +261,10 @@ class PotentialColouredBall:
     def draw_many(draw_frame, circles:List["PotentialColouredBall"], color=(255,128,128), thickness=1):
         for circle in circles:
             x, y, r = circle.circle
+            reasons = []
+            for p in circle.probabilities:
+                reasons.append(p[1])
             imageprocessing.draw_circle(draw_frame, (x, y), r, color, thickness)
+            imageprocessing.draw_histograms(x, y, circle.blurred_hists, draw_frame)
+            imageprocessing.draw_text(draw_frame, str(int(circle.probability * 100)), (x, y - 10))
+            imageprocessing.draw_text(draw_frame, str(circle.color_name) + ' ' + str(circle.hue), (x - 30, y - 30))
