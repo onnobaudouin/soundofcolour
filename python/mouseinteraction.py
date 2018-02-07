@@ -65,6 +65,10 @@ class MouseInteraction:
                 self.mode = MouseInteraction.STATIC
                 # self.original_pos = None
                 # self.radius = 3
+        if event == cv2.EVENT_LBUTTONDOWN:  
+            self.mode = MouseInteraction.NONE
+            self.original_pos = None      
+                
 
     def attach_to_window(self, window_name):
         cv2.setMouseCallback(window_name,

@@ -84,6 +84,7 @@ class ColouredBallTracker(object):
 
         self.internal_message_queue = queue.Queue()
         self.main_thread_q = queue.Queue()
+        self.per_second = FramesPerSecond()
 
     def start_video_stream(self) -> VideoStream:
         recommended_video_resolution, recommended_frame_rate = self.recommended_video_resolution_and_frame_rate()
@@ -96,14 +97,17 @@ class ColouredBallTracker(object):
 
         vs.on_frame(self.on_video_stream_frame_handler)
         vs.start()
+        if vs is not None:
+            print("Video Stream Returned OK")
 
         return vs
 
     # based on runtime situation select appropriate
     def recommended_video_resolution_and_frame_rate(self):
         if self.IS_RUNNING_ON_PI:
-            multiplier = 100  # 120 is fine for 30fps, 2 colours
-            resolution = (4 * multiplier, 3 * multiplier + 4)
+            multiplier = 80
+            resolution = (4 * multiplier, 3 * multiplier)
+            # resolution = (1640, 1232)
             frame_rate = 30
         else:
             resolution = (int(1280 / 2), int(720 / 2))
@@ -122,6 +126,8 @@ class ColouredBallTracker(object):
         self.properties_ui.show('colours/blue')
         self.properties_ui.show('colours/pink')
         self.properties_ui.show('colours/green')
+        self.properties_ui.show('colours/orange')
+        self.properties_ui.show('colours/yellow')      
         self.properties_ui.show('ui')
         self.properties_ui.show('tracker')
         self.properties_ui.show('hough')
@@ -183,12 +189,14 @@ class ColouredBallTracker(object):
 
         new_balls = []
 
+        morph_kernel = np.ones((3,3), np.uint8)
+
         for colour in colours:
             mask = imageprocessing.mask_of_colour(hsv_frame, colour.minimum_hsv, colour.maximum_hsv)
 
-            # TODO: optimize for platform as usefull
-            # # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel(), iterations=1)
-            # # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel(), iterations=2)
+            # TODO: optimize for platform as usefull -> for some reason this is VERY slow on the rpi...
+            # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=morph_kernel, iterations=1)
+            # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=morph_kernel, iterations=1)
             colour.mask = mask
             #
             contours = imageprocessing.contours_of_colour_range_in(colour.mask)
@@ -254,12 +262,12 @@ class ColouredBallTracker(object):
 
         self.ball_tracker.set_max_distance(width * max_distance)
 
-        index = 0
-        for colour in active_colours:
-            imageprocessing.draw_text(frame, str(colour.name), (10, index * 20 + 15))
-            imageprocessing.draw_text(frame, 'min: ' + str(colour.minimum_hsv), (20, (index + 1) * 20 + 15))
-            imageprocessing.draw_text(frame, 'max: ' + str(colour.maximum_hsv), (20, (index + 2) * 20 + 15))
-            index = index + 3
+        #index = 0
+        #for colour in active_colours:
+        #    imageprocessing.draw_text(frame, str(colour.name), (10, index * 20 + 15))
+        #    imageprocessing.draw_text(frame, 'min: ' + str(colour.minimum_hsv), (20, (index + 1) * 20 + 15))
+        #    imageprocessing.draw_text(frame, 'max: ' + str(colour.maximum_hsv), (20, (index + 2) * 20 + 15))
+        #    index = index + 3
 
         balls_in_frame, active_colours = self.coloured_balls_in(
             bgr_frame=frame,
@@ -376,41 +384,53 @@ class ColouredBallTracker(object):
         :return:
         """
         vs = self.video_stream
+        if vs is None:
+            # print ("no video_stream")
+            return
+            
+        if self.per_second.add():    
+            vs.print_stats()    
+            
+            
         new_frame, last_valid_frame, frame_count, resolution = vs.latest()
         if new_frame is not None:
             self.frame = new_frame
-
-            # if self.background_frame is not None:
-            #     difference_mask = cv2.absdiff(self.frame, self.background_frame)
-            #     img2gray = cv2.cvtColor(difference_mask, cv2.COLOR_BGR2GRAY)
-            #     ret, self.difference_mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
-
-            # if self.mouse.mode == MouseInteraction.DRAWING:
+            
             self.sampling_frame = imageprocessing.clone_image(
-                self.frame)  # moved into main as used a lot TODO: perf impact
-
-            self.state.run()
-
-            # mouse overlay
-            if self.mouse.mode == MouseInteraction.DRAWING or self.mouse.mode == MouseInteraction.STATIC:
-                self.mouse.draw_on(self.frame, self.sampling_frame)
-                if self.sampling_frame_hsv is not None:
-                    if self.mouse.original_pos is not None:
-                        x, y = self.mouse.original_pos
-                        PotentialColouredBall.statistics_of_circle_of_being_coloured_ball(
-                            (x, y, self.mouse.radius),
-                            self.sampling_frame_hsv,
-                            self.sampling_frame,
-                            self.frame
-                        )
-
+                    self.frame)  # moved into main as used a lot TODO: perf impact
+                    
+            self.state.run()        
+                    
             imageprocessing.draw_text(self.frame, "frame: " + str(frame_count) +
-                                      ' fps:' + str(self.video_stream.frames_per_second.fps),
-                                      pos=(10, int(imageprocessing.resolution_of(self.frame)[1] - 20)))
+                                          ' fps:' + str(self.video_stream.frames_per_second.fps),
+                                          pos=(10, int(imageprocessing.resolution_of(self.frame)[1] - 20)))
 
-            # self.last_frame = imageprocessing.clone_image(self.frame)  # this can be removed...
+            self.fire_frame_handler(frame_count)        
+            
+            
+                
+            
+            
 
-            self.fire_frame_handler(frame_count)
+
+ 
+                
+
+                # mouse overlay
+            if self.is_showing_ui:
+                if self.mouse.mode == MouseInteraction.DRAWING or self.mouse.mode == MouseInteraction.STATIC:
+                    self.mouse.draw_on(self.frame, self.sampling_frame)
+                    if self.sampling_frame_hsv is not None:
+                        if self.mouse.original_pos is not None:
+                            x, y = self.mouse.original_pos
+                            PotentialColouredBall.statistics_of_circle_of_being_coloured_ball(
+                                (x, y, self.mouse.radius),
+                                self.sampling_frame_hsv,
+                                self.sampling_frame,
+                                self.frame
+                            )
+
+               
 
     def start(self):
         if self.is_thread_running():
@@ -495,6 +515,8 @@ class ColouredBallTracker(object):
                 self.state.start("calibrate")
             elif key == ord("b"):
                 self.set_background_to_average_background()
+            elif key == ord("u"):
+                self.close_ui()    
 
     def show_ui(self, state=True):
         self.should_be_showing_ui = bool(state)
@@ -507,7 +529,7 @@ class ColouredBallTracker(object):
     def message_to_main_thread(self, message):
         self.main_thread_q.put(message)
 
-    def message_from_queue(self, a_queue, timeout=0.001):
+    def message_from_queue(self, a_queue, timeout=0.00001):
         try:
             msg = a_queue.get(True, timeout)  # check if we have a new image...
             return msg
@@ -541,9 +563,10 @@ class ColouredBallTracker(object):
         this is a blocking call.
         """
         try:
+            self.video_stream = self.start_video_stream()
             self.state.start('wait_for_first_frame')
 
-            self.video_stream = self.start_video_stream()
+            
 
             while self.thread_should_be_running:
                 msg = self.message_from_queue(self.internal_message_queue)
