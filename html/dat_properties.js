@@ -21,15 +21,29 @@ class DatGUIPropertiesView {
         this.onChanged = null;
     }
     
-    attach_event_handler(prop_node, dat_object) {
-        prop_node.dat_controller = dat_object;
-        prop_node.dat_controller.onChange((value) => {this.onChange(prop_node, value)});
+    attach_event_handler(prop_node, dat_object, sub='', sub_index=-1) {
+        if (sub_index === -1) {
+            prop_node.dat_controller = dat_object;
+            prop_node.dat_controller.onChange((value) => {
+                this.onChange(prop_node, value)
+            });
+        } else {
+            //one propnode has multiple DAT_GUI controllers - keep track of all...
+            if (typeof prop_node.dat_controllers === 'undefined') {
+                prop_node.dat_controllers = {}
+            }
+            prop_node.dat_controllers[sub] = dat_object
+            prop_node.dat_controllers[sub].onChange((value) => {
+                this.onChange(prop_node, value, sub, sub_index)
+            });
+        }
     }
     
     update() {
         this.update_node(this.properties);
     }
     
+    //PROP to UI
     update_node(prop_node) {
         let path = prop_node.path().join('/');
         switch(prop_node.type) {
@@ -53,6 +67,22 @@ class DatGUIPropertiesView {
                 this.gui_obj[path] = {h:parseInt(t[0]), s:t[1], v:t[2]};
                 prop_node.dat_controller.updateDisplay(); //update ui.
             } break;
+            case PropNodeType.point:
+            case PropNodeType.rect:
+            {
+                let t = prop_node.value();
+                prop_node.names.forEach((name, index) => {
+                    let subpath = path+':'+name;
+                    this.gui_obj[subpath] = t[index];
+                   // this.attach_event_handler(prop_node, f.add(gui_obj, subpath).min(prop_node.min[index]+0.0).max(prop_node.max[index]+0.0), name, index);
+                    prop_node.dat_controllers[name].updateDisplay(); //update ui.
+        
+                });
+               
+                
+                
+                
+            }   break;
         }
     }
     
@@ -61,15 +91,15 @@ class DatGUIPropertiesView {
         this.notify(prop_node);
     }
     
-    onChange(prop_node, value) {
-        //console.log(prop_node.path().join('/') + ' = '+value);
+    //UI to PROP
+    onChange(prop_node, value, sub='', sub_index=0) {
+       // console.log(prop_node.path().join('/') +sub+ ' = '+value);
         switch (prop_node.type) {
             case PropNodeType.unsigned_int:
             case PropNodeType.unsigned_float:
             case PropNodeType.float:
             case PropNodeType.int:
             case PropNodeType.bool:
-            
             case PropNodeType.string:
             {
                 if(prop_node.set(value, undefined, true)) {
@@ -80,7 +110,7 @@ class DatGUIPropertiesView {
             } break;
             case PropNodeType.hsv:
             {
-                if(prop_node.set([parseInt(value.h), value.s, value.v], undefined, true)) { //2 because opencv - maybe change this as H does mean 360?
+                if(prop_node.set([parseInt(value.h), value.s, value.v], undefined, true)) {
                     this.notify(prop_node);
                 }
             } break;
@@ -92,6 +122,17 @@ class DatGUIPropertiesView {
                     this.notify(prop_node);
                 }
             } break;
+    
+            case PropNodeType.point:
+            case PropNodeType.rect:
+            {
+                if(prop_node.set(value, sub_index)) {
+                    //todo - properties should notify!
+                    //console.log('notifiy point or rect'+value+' / '+sub_index);
+                    this.notify(prop_node);
+                }
+            } break;
+            
         }
     }
     
@@ -144,6 +185,17 @@ class DatGUIPropertiesView {
             case PropNodeType.rgb: {
                 gui_obj[path] = prop_node.default;
                 this.attach_event_handler(prop_node,prop_attach.addColor(gui_obj, path));
+                break;
+            }
+            case PropNodeType.rect:
+            case PropNodeType.point: {
+                let f = gui.addFolder(path);
+                prop_node.names.forEach((name, index) => {
+                    let subpath = path+':'+name;
+                    gui_obj[subpath] = prop_node.default[index];
+                    this.attach_event_handler(prop_node, f.add(gui_obj, subpath).min(prop_node.min[index]+0.0).max(prop_node.max[index]+0.0).step(0.001), name, index);
+                    
+                });
                 break;
             }
             default: {

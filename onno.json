@@ -8,17 +8,17 @@
     "acc": 1.187058823529412
   },
   "tracker": {
-    "blur": 0,
-    "min_circle": 0,
-    "max_circle": 87,
-    "min_area": 14,
+    "blur": 7,
+    "min_circle": 142,
+    "max_circle": 250,
+    "min_area": 18,
     "distance": 0.21402722729622609,
     "averaged_frames": 31,
     "median": 3,
     "debug": true
   },
   "ui": {
-    "show_masks": false
+    "show_masks": true
   },
   "colours": {
     "blue": {
@@ -47,18 +47,18 @@
         0
       ],
       "min_hsv": [
-        130,
-        0.39215686274509803,
+        131,
+        0.1843137254901961,
         0.19607843137254902
       ],
       "max_hsv": [
-        150,
+        182,
         1.0,
         1.0
       ]
     },
     "yellow": {
-      "enabled": false,
+      "enabled": true,
       "rgb": [
         255,
         255,

@@ -40,8 +40,8 @@ class ColouredBallTracker(object):
         self.thread = None
         self.thread_should_be_running = False
 
-        self.is_showing_ui = False
-        self.should_be_showing_ui = False
+        self.is_showing_ui = True
+        self.should_be_showing_ui = True
 
         self.frame = None
         self.sampling_frame = None

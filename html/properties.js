@@ -7,7 +7,9 @@ const PropNodeType = {
     rgb: 5,
     hsv: 6,
     string: 7,
-    float: 8
+    float: 8,
+    point: 9,
+    rect: 10
 };
 
 const PropTypeSingleNumeric = [
@@ -20,6 +22,13 @@ const PropTypeSingleNumeric = [
 const PropTypeMultipleNumeric = [
     PropNodeType.rgb,
     PropNodeType.hsv,
+];
+
+const PropTypeMultiple = [
+    PropNodeType.rgb,
+    PropNodeType.hsv,
+    PropNodeType.point,
+    PropNodeType.rect
 ];
 
 class PropNode {
@@ -131,6 +140,16 @@ class Property extends PropNode {
                 this.max = [180, 255, 255];
                 this.names = ["hue", "saturation", "luminosity"];
                 break;
+            case PropNodeType.rect:
+                this.min = [0.0, 0.0, 0.0, 0.0];
+                this.max = [1.0, 1.0, 1.0, 1.0];
+                this.names = ["x1", "y1", "x2", "y2"];
+                break;
+            case PropNodeType.point:
+                this.min = [0.0, 0.0];
+                this.max = [1.0, 1.0];
+                this.names = ["x", "y"];
+                break;
             default:
                 console.log("Unknown PropType: type")
         }
@@ -141,6 +160,10 @@ class Property extends PropNode {
                 this.default = false;
             } else if (this.is_multiple_numeric()) {
                 this.default = [0, 0, 0]; //todo: convert to float if float.?
+            } else if (this.type === PropNodeType.rect) {
+                this.default = [0,0,0,0];
+            } else if (this.type === PropNodeType.point) {
+                this.default = [0,0];
             }
         }
         if (value !== undefined) {
@@ -157,6 +180,10 @@ class Property extends PropNode {
     
     is_multiple_numeric() {
         return PropTypeMultipleNumeric.includes(this.type);
+    }
+    
+    is_multiple() {
+        return PropTypeMultiple.includes(this.type);
     }
     
     range(minimum = undefined, maximum = undefined) {
@@ -181,11 +208,17 @@ class Property extends PropNode {
     set(value, index = undefined, from_run_time_change = true) {
         // TODO: check TYPES
         let temp_value = this.value();
+        if(this.is_multiple()) {
+            if(temp_value) {
+                temp_value = temp_value.slice(); //make a copy of all the values, not a ref to it...
+            }
+        }
         if (this.is_single_numeric()) {
             this._value = Property.clip(value, this.min, this.max);
         }
-        else if (this.is_multiple_numeric()) {
+        else if (this.is_multiple()) {
             if ((index !== undefined) && (index < this.min.length)) {
+               // console.log('setting sub value');
                 this._value[index] = Property.clip(value);
             } else if (value.length === this.min.length) {
                 this._value = value.map((val, index) => {
@@ -204,7 +237,7 @@ class Property extends PropNode {
         }
         
         let was_changed = false;
-        if (this.is_multiple_numeric()) {
+        if (this.is_multiple()) {
             was_changed = !Property.are_numeric_arrays_the_same(temp_value, this._value);
         } else {
             was_changed = (temp_value !== this._value)

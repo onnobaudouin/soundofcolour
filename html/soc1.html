@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sound Of Colour</title>
+    <script src="socketclient.js"></script>
+    <script src="properties.js"></script>
+    <script src="canvas2d.js"></script>
+    <script src="value_to_json.js"></script>
+    <!-- https://github.com/balint42/diff.js/tree/master -->
+    <!-- <script src="diff.js-master/diff.min.js"></script> -->
+    <script src="imageprocessing.js"></script>
+    <script src="properties_socket_client.js"></script>
+    <script src="howler.min.js"></script>
+
+    <script language="javascript" type="text/javascript">
+        class ColouredBallServer extends PropertiesSocketClient {
+            constructor() {
+                super(false);
+                this.balls = [];
+                this.resolution = {width: 0, height: 0};
+                this.listeners = [];
+            }
+
+            addListener(listener) {
+                this.listeners.push(listener);
+            }
+
+            connect(url) {
+                this.url = url;
+                this.start_connect(this.url);
+            }
+
+            on_properties_loaded(message) {
+                this.send_tasks_per_frame("balls", "balls_task_b2", "start"); //requests balls to be sent...
+            }
+
+            //will be called...
+            on_task_balls(message) {
+               // this.update_canvas_size(message.resolution[0], message.resolution[1]);
+                this.resolution.width = message.resolution[0];
+                this.resolution.height = message.resolution[1];
+
+                let playArea = this.properties.value_of('area');
+                const x1 = Math.round(this.resolution.width * playArea[0]);
+                const y1 = Math.round(this.resolution.height * playArea[1]);
+                const x2 = Math.round(this.resolution.width * playArea[2]);
+                const y2 = Math.round(this.resolution.height * playArea[3]);
+                const rect = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
+
+                const w = rect[2] - rect[0];
+                const h = rect[3] - rect[1];
+
+                //wrap balls up in simple object
+                let balls = message.balls.map(b => {
+                    return {
+                        id: parseInt(b[0]),
+                        colour: b[1],
+                        radius: parseFloat(b[2]),
+                        x: parseInt(b[3]),
+                        y: parseInt(b[4]),
+                        x_from: parseInt(b[5]),
+                        y_from: parseInt(b[6]),
+                        x_pa: ((parseFloat(b[3])-rect[0]) / w), //in the play area as percentage...
+                        y_pa:  ((parseFloat(b[4])-rect[1]) / h),
+                        radius_pa: (parseFloat(b[2]) / w),
+
+                    };
+                });
+
+                //split into 3 groups - new, updated, and dead.
+                this.balls.forEach(ball => ball.state = 'dead'); //presume we are all dead...
+
+                let newBalls = [];
+                balls.forEach(ball => {
+                    let update = this.balls.find(currentBall => ball.id === currentBall.ball.id);
+                    if (update) {
+                        update.ball = ball; //simple overwrite the ball method.
+                        update.state = 'updated';
+                    } else {
+                        this.balls.push({ball:ball, state:'new'});
+                    }
+                });
+
+                //all are either new, dead, or updated...
+                this.listeners.forEach(listener => {
+                    listener(this.balls, this.resolution, rect, w, h)
+                });
+
+                //now strip the dead...
+                this.balls = this.balls.filter(ball => ball.state !== 'dead');
+
+
+            }
+        }
+    </script>
+
+    <script>
+        class Sound {
+            constructor(inst, noteIndex) {
+                this.inst = inst;
+                this.noteIndex = noteIndex;
+                this.id = null;
+            }
+            play() {
+                this.id = this.inst.play(this.noteIndex+'');
+            }
+            volume(percent) {
+               // console.log(percent+' '+this.id);
+                this.inst.volume(percent, this.id);
+            }
+            rate(rate) {
+                this.inst.rate(rate, this.id);
+            }
+            pan(leftOrRight) {
+                this.inst.stereo(leftOrRight, this.id);
+            }
+        }
+
+        class SimpleSoundManager {
+            constructor() {
+                const inst = ["bass", "harp", "piano", "voice"];
+                this.instruments = {};
+                inst.forEach(instrument => {
+                    this.instruments[instrument] = this.load(instrument+".wav", 20, 1000, 750);
+                });
+            }
+            load(fileName, noteCount=20, noteTimeSeperation=1000, noteLength=750) {
+                let sprites = {};
+                for (let x=0; x<noteCount; x++) {
+                    sprites[x+''] = [x*noteTimeSeperation, noteLength]
+                }
+                return new Howl({
+                    src: [fileName],
+                    volume: 1,
+                    sprite: sprites
+                });
+            }
+            play(instrument, noteIndex) {
+                let s =  new Sound(this.instruments[instrument], noteIndex);
+                s.play();
+                return s;
+            }
+        }
+    </script>
+
+
+    <script language="javascript" type="text/javascript">
+
+
+
+        class SoundOfColourServer {
+            constructor() {
+                this.server = new ColouredBallServer();
+                this.sounds = new SimpleSoundManager();
+
+                this.colour_to_instrument = {
+                    'red': 'voice',
+                    'blue': 'bass',
+                    'yellow': 'harp',
+                    'green': 'piano'
+                };
+
+                this.server.addListener(this.onBalls.bind(this));
+
+                /*@var Canvas2D */
+                this.canvas2d = null;
+
+            }
+
+            connect_ui(parent_element) {
+                this.setup_dom(parent_element);
+                this.canvas2d = new Canvas2D(this.id_extra('canvas'));
+                this.connect_button = document.getElementById(this.id_extra('connect'));
+                this.connect_button.addEventListener('click', () => {
+                    let ip = document.getElementById(this.id_extra('ip')).value;
+                  // "ws://" + ip + ":8001";
+                    this.server.connect("ws://" + ip + ":8001");
+                });
+            }
+
+            draw_balls(balls, resolution, rect) {
+                this.canvas2d.update_resolution(resolution.width, resolution.height);
+                //this.balls = balls;
+                //draw the balls...
+                this.canvas2d.clear();
+                balls.forEach(ball => {
+                    this.canvas2d.circle(ball.ball.x, ball.ball.y, ball.ball.radius, ball.ball.colour);
+                    this.canvas2d.text(ball.ball.x, ball.ball.y, '' + ball.ball.id);
+                    this.canvas2d.line(ball.ball.x, ball.ball.y, ball.ball.x_from, ball.ball.y_from, ball.ball.colour);
+                });
+
+                this.canvas2d.rect(rect[0], rect[1], rect[2], rect[3], [255,0,0]);
+            }
+
+            experiment_1(balls) {
+                balls.forEach(ball => {
+                    let b = ball.ball;
+                    //each ball has a state..
+                    if (ball.state === 'new') {
+                        ball.noteIndex = -1;
+                    }
+                    if (ball.state === 'dead') {
+                        //stop playing sound or something...
+
+
+                    }
+                    //look at position on x axis for note..
+                    let noteIndex = Math.round(b.x_pa * 19); //20 notes over x axis..
+
+                    if (ball.noteIndex !== noteIndex) {
+                        //stop previous?
+                        ball.sound = this.sounds.play(this.colour_to_instrument[b.colour], noteIndex);
+                        ball.noteIndex = noteIndex;
+                    }
+
+                    // y to pitch adjust...
+                    if (ball.sound) {
+                        ball.sound.rate(0.2 + (b.y_pa * 2.0));
+                    }
+
+                    //radius to volumne
+                    if (ball.sound) {
+                        ball.sound.volume(0.75 + (b.radius_pa * 0.50));
+                    }
+
+                    //panningg...
+                    if(ball.sound) {
+                        let pan = (b.x_pa * 2.0) - 1.0;
+                        ball.sound.pan(pan);
+                    }
+
+
+
+                })
+            }
+
+
+            onBalls(balls, resolution, rect) {
+                this.draw_balls(balls, resolution, rect);
+                this.experiment_1(balls);
+            }
+
+
+
+
+
+            id_extra(extra) {
+                return (this.id + extra)
+            }
+
+            id_as_html(extra = '') {
+                return ' id="' + this.id_extra(extra) + '" ';
+            }
+
+            setup_dom(parent_element) {
+                this.element = document.createElement("div");
+                this.element.id = this.id_extra('');
+                const html = '<div>' +
+                    '<canvas ' + this.id_as_html('canvas') + '></canvas>' +
+                    '</div>' +
+                    '<div>' +
+                    '<input type="text" value="192.168.20.1"' + this.id_as_html('ip') + '>' +
+                    '<button ' + this.id_as_html('connect') + '>Connect</button>' +
+
+
+                    '</div>';
+                this.element.innerHTML = html;
+                parent_element.appendChild(this.element);
+            }
+        }
+
+        SoundOfColourServer.id_gen = 0; //stupid ES6.0 doesn't easily support class variables
+    </script>
+    <script>
+
+    </script>
+
+</head>
+<body id="body">
+
+</body>
+<script>
+    const soc = new SoundOfColourServer();
+    soc.connect_ui(document.getElementById('body'));
+</script>
+</html>

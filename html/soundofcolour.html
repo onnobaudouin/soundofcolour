@@ -12,215 +12,17 @@
     <script src="dat.gui.min.js"></script>
     <script src="dat_properties.js"></script>
     <!-- https://github.com/balint42/diff.js/tree/master -->
-    <script src="diff.js-master/diff.min.js"></script>
+    <!-- <script src="diff.js-master/diff.min.js"></script> -->
+    <script src="imageprocessing.js"></script>
+    <script src="properties_socket_client.js"></script>
+
+
     <script>
-        function object_to_map(object) {
-            let m = new Map();
-            for (let key in object) {
-                if (Object.prototype.hasOwnProperty.call(object, key)) {
-                    m.set(key, object[key]);
-                }
-            }
-            return m;
-        }
-
-        function hslToRgb(h, s, l) {
-            let r, g, b;
-
-            if (s === 0) {
-                r = g = b = l; // achromatic
-            } else {
-                let hue2rgb = function hue2rgb(p, q, t) {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1 / 6) return p + (q - p) * 6 * t;
-                    if (t < 1 / 2) return q;
-                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                    return p;
-                };
-
-                let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                let p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1 / 3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1 / 3);
-            }
-
-            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-        }
-
-    </script>
-    <script>
-        //http://dev.theomader.com/gaussian-kernel-calculator/
-        function gaussian_kernel(size) {
-            const kerns = [
-                [1],
-                null,
-                [0.27901, 0.44198, 0.27901],
-                null,
-                [0.06136, 0.24477, 0.38774, 0.24477, 0.06136],
-                null,
-                [0.00598, 0.060626, 0.241843, 0.383103, 0.241843, 0.060626, 0.00598]
-            ];
-            //Q kerns[size].handle(out_of_bound:0)
-            //  element(kerns, size, if out_of_bound)
-            //size.is_between(1, 8)
-            if (size >= 1 && size < 8) {
-                return kerns[size - 1]; //0 indexede
-            }
-            return null;
-        }
-
-        function gaussian_blur(hist, size = 5, circular = true) {
-            const kernel = gaussian_kernel(size);
-            if (kernel === null) {
-                console.log('Not A Valid Gaussian Kernel Size ' + size);
-                return hist;
-            }
-            let index = 0;
-            let kern_index = 0;
-            const len = hist.length;
-            let output = filled_array(len, 0);
-            let offset = 0;
-            const neg = Math.floor(size / 2.0);
-            let value = 0;
-
-            //1 D CONVOLVE
-            for (; index < len; index++) { //FOR ALL ELEMENTS
-                value = 0;
-                for (kern_index = 0; kern_index < size; kern_index++) {
-                    offset = index + kern_index - neg;
-                    if (offset < 0) {
-                        if (circular) {
-                            offset = len + offset; // - -
-                        } else {
-                            offset = 0; //repeat keft most
-                        }
-                    } else if (offset >= len) {
-                        if (circular) {
-                            offset = offset % len;
-                        } else {
-                            offset = len - 1;
-                        }
-                    }
-                    value += (kernel[kern_index] * hist[offset]);
-                }
-                output[index] = value;
-            }
-
-            //console.log(output);
-            return output;
-        }
-
-        function blur(hist, size = 5, circular = true, times = 1) {
-            let output = hist;
-            for (let i = 0; i < times; i++) {
-                output = gaussian_blur(output, size, circular);
-            }
-            return output;
-        }
-
-
-        function findLocalMaxima(hist, window_size = 5, is_circular = true) {
-            if (window_size % 2 === 0) {
-                console.log("window_size must be uneven. findLocalMaxima");
-                return null;
-            }
-            const len = hist.length;
-            const output = [];
-            let index = 0;
-            let current_value = 0;
-            const either_side = Math.floor(window_size / 2.0);
-            let window_index = 0;
-            let is_highest = false;
-            for (; index < len; index++) { //FOR ALL ELEMENTS
-                current_value = hist[index];
-                is_highest = true;
-                for (window_index = index - either_side; window_index < index + either_side; window_index++) {
-                    if (window_index !== index) { //ignore self
-                        if (is_circular === false) {
-                            if (window_index >= 0 && window_index < len) { //only when in bounds
-                                if (hist[window_index] > current_value) {
-                                    is_highest = false; //someone else is bigger...
-                                    break;
-                                }
-                                //what if equal - i.e. if 3 or more thing are same height we should pick the middle one
-                            }
-                        } else {
-                            let t_index = window_index;
-                            if (window_index < 0) {
-                                t_index = len + window_index;
-                            } else if (window_index >= len) {
-                                t_index = window_index - len + 1; //256 -> 1
-                            }
-                            if (hist[t_index] > current_value) {
-                                is_highest = false; //someone else is bigger...
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (is_highest) {
-                    if (current_value !== 0) {
-                        output.push(index);
-                    }
-                }
-            }
-            return output;
-
-
-        }
-
-        function filled_array(size, value) {
-            return Array(size).fill(value);
-        }
 
     </script>
 
     <script language="javascript" type="text/javascript">
-
-        class Histogram {
-            constructor(running_samples = 5) {
-                this.samples = null;
-                this.running_samples = running_samples;
-                this.width = null;
-            }
-
-            addSample(sample) {
-                const width = sample.length;
-                if (this.width !== width) {
-                    console.log('resettign samples for histogram');
-                    this.samples = [];
-                    this.width = width;
-                }
-                this.samples.push(sample);
-                while (this.samples.length > this.running_samples) {
-                    this.samples.shift();
-                }
-            }
-
-            reset() {
-                this.samples = [];
-                this.width = null;
-            }
-
-            average() {
-                let avg = filled_array(this.width, 0);
-                this.samples.forEach(sample => {
-                    sample.forEach((value, index) => {
-                        avg[index] += value;  //add up all values...
-                    })
-                });
-                const len = this.samples.length;
-                if (len > 0) {
-                    return avg.map(value => Math.round(value / len));
-                }
-                return avg;
-            }
-        }
-
-
-        class SoundOfColourServer extends SocketClient {
+        class SoundOfColourServer extends PropertiesSocketClient {
 
             constructor() {
                 super();
@@ -229,22 +31,30 @@
                 this.resolution = {width: 0, height: 0};
                 /*@var Canvas2D */
                 this.canvas2d = null;
+                /*@var Canvas2D */
                 this.histogramCanvas = null;
+                /*@var Canvas2D */
                 this.histogram2Canvas = null;
-                // this.img = null;
+                /*@var Canvas2D */
+                this.canvas = null;
+
                 this.show_ui = false;
-                this.properties_ui = null;
+
 
                 this.is_sampling_colour = false;
                 this.samplingStart = null;
                 this.samplingCurrent = null;
-                this.lastHSVHistogram = null;
-                this.lastHistogram = null;
+
+
                 this.lastColourResult = null;
 
-                this.hsv_hist = {"hue": new Histogram(), "saturation": new Histogram(), "luminosity": new Histogram()};
+                this.hsv_histogram_averaged = {
+                    "hue": new Histogram(),
+                    "saturation": new Histogram(),
+                    "luminosity": new Histogram()
+                };
 
-                this.task_id = 0;
+
                 this.frame = null;
 
             }
@@ -253,6 +63,8 @@
                 this.setup_dom(parent_element);
                 this.canvas2d = new Canvas2D(this.id_extra('canvas'));
                 this.canvas2d.mouse_event_handler = (name, pos) => this.on_mouse_event(name, pos);
+
+                this.canvas = new Canvas2D(this.id_extra('canvas_balls'));
 
                 this.histogramCanvas = new Canvas2D(this.id_extra('histogram'));
                 this.histogramCanvas.update_resolution(256 * 2, 64 * 3);
@@ -293,10 +105,44 @@
 
             }
 
-            distance(x1, y1, x2, y2) {
-                const dx = x1 - x2;
-                const dy = y1 - y2;
-                return Math.sqrt(dx * dx + dy * dy);
+            on_add_custom_props(properties) {
+                let f = properties.add_group('frame');
+                    f.add('send_frame', PropNodeType.bool, true);
+                    f.add('quality', PropNodeType.unsigned_int, 50, 0, 100);
+                let h = properties.add_group('histogram');
+                    h.add('samples', PropNodeType.unsigned_int, 30, 1, 100);
+                    h.add('blur', PropNodeType.unsigned_int, 3, 1, 7); //todo - makes it ordinal
+                    h.add('blur_times', PropNodeType.unsigned_int, 1, 1, 100); //todo - makes it ordinal
+                    h.add('maxima_range', PropNodeType.unsigned_int, 9, 1, 256); //todo - makes it ordinal
+                    h.add('maxima_threshold', PropNodeType.unsigned_float, 0.5, 0.0, 1.0); //todo - makes it ordinal
+                    h.add('signal_minimum', PropNodeType.unsigned_float, 0.09, 0.0, 1.0); //todo - makes it ordinal)
+            }
+
+            on_handle_property_changed(path, prop_node) {
+                switch (path) {
+                    case "frame/send_frame":
+                        const mode = prop_node.value() ? 'start' : 'stop';
+                        this.send_tasks_per_frame("frame", "frame_task", mode); //update the frames task...
+                        return true;
+                    case "frame/quality":
+                        this.send_tasks_per_frame("frame", "frame_task", "update", {'quality': prop_node.value()}); //update the frames task...
+                        return true;
+                    case "histogram/samples":
+                        //console.log(prop_node.value());
+                        this.hsv_histogram_averaged.hue.running_samples = prop_node.value();
+                        this.hsv_histogram_averaged.saturation.running_samples = prop_node.value();
+                        this.hsv_histogram_averaged.luminosity.running_samples = prop_node.value();
+                        return true;
+
+                    default:
+
+                }
+                return false;
+            }
+
+            on_properties_loaded(message) {
+                this.send_tasks_per_frame("frame", "frame_task", "start"); //requests frames to be sent...
+                this.send_tasks_per_frame("balls", "balls_task", "start"); //requests balls to be sent...
             }
 
             on_mouse_event(event_name, position_mouse_in_canvas) {
@@ -315,7 +161,7 @@
                                         event: 'move', x: this.samplingCurrent.xPercent,
                                         y: this.samplingCurrent.yPercent
                                     });
-                                const radius = this.distance(
+                                const radius = distance(
                                     this.samplingStart.x,
                                     this.samplingStart.y,
                                     this.samplingCurrent.x,
@@ -368,9 +214,9 @@
                             /*   this.send_tasks_per_frame("sample", "sample_hsv", "stop");
                                this.lastHSVHistogram = null;
                                this.lastHistogram = null;
-                               this.hsv_hist.hue.reset();
-                               this.hsv_hist.saturation.reset();
-                               this.hsv_hist.luminosity.reset();*/
+                               this.hsv_histogram_averaged.hue.reset();
+                               this.hsv_histogram_averaged.saturation.reset();
+                               this.hsv_histogram_averaged.luminosity.reset();*/
 
                         }
                         break;
@@ -380,250 +226,28 @@
 
             }
 
-            on_close(event) {
-                console.log("connection closed - killing ui...");
-                this.properties_ui.destroy();
-                this.properties_ui = null;
-
-            }
-
-
-            on_open(event) {
-                console.log("connected....");
-            }
-
-
-            send_tasks_per_frame(task, id = null, state = null, data = null) {
-                task = this.get_task(task, id, state, data)
-                this.send_message("tasks_per_frame",
-                    {
-                        'tasks': [
-                            task
-                        ]
-                    });
-                return task;
-            }
-
-            get_task(task, id = null, state = null, data = null) {
-                if (id === null) {
-                    id = 't_' + this.task_id++;
-                }
-                return {
-                    "task": task,
-                    "state": state,
-                    "id": id,
-                    "data": data
-                }
-            }
-
-
             update_canvas_size(width, height) {
                 this.resolution.width = width;
                 this.resolution.height = height;
                 this.canvas2d.update_resolution(width, height);
-            }
-
-            on_message_welcome() {
-                this.send_message('prop_description')
-            }
-
-
-            on_message_prop_description(message) {
-                let p = object_to_map(message);
-                this.properties = [];
-                p.forEach((value, key) => {
-                    if (typeof value["type"] !== 'undefined') {
-                        this.properties.push(Properties.create_from_description_object(value));
-                    }
-                });
-                //console.log(this.properties);
-
-                let t = this.properties[0];
-                let f = t.add_group('frame');
-                f.add('quality', PropNodeType.unsigned_int, 50, 0, 100);
-
-                let h = t.add_group('histogram');
-                h.add('samples', PropNodeType.unsigned_int, 30, 1, 100);
-                h.add('blur', PropNodeType.unsigned_int, 3, 1, 7); //todo - makes it ordinal
-                h.add('blur_times', PropNodeType.unsigned_int, 1, 1, 100); //todo - makes it ordinal
-                h.add('maxima_range', PropNodeType.unsigned_int, 9, 1, 256); //todo - makes it ordinal
-                h.add('maxima_threshold', PropNodeType.unsigned_float, 0.5, 0.0, 1.0); //todo - makes it ordinal
-                h.add('signal_minimum', PropNodeType.unsigned_float, 0.09, 0.0, 1.0); //todo - makes it ordinal)
-
-
-                this.properties_ui = new DatGUIPropertiesView();
-                this.properties_ui.from_properties(t);
-
-
-                this.coloured_ball_tracker_properties = t;
-
-
-                this.send_message('prop_all', {'properties_name': 'coloured_ball_tracker'});
-            }
-
-            on_message_prop_all(message) {
-                console.log(message);
-                this.coloured_ball_tracker_properties.from_contents(message);
-                this.properties_ui.update(); //todo -> properties should warn a UI that it has changed...
-                this.properties_ui.onChanged = (prop_node) => {
-                    this.onPropChanged(prop_node);
-                }; // this is ALL WRONG...
-                this.send_tasks_per_frame("frame", "frame_task", "start"); //requests frames to be sent...
-                this.send_tasks_per_frame("balls", "balls_task", "start"); //requests balls to be sent...
-            }
-
-            on_message_prop(message) {
-                console.log(message);
-                this.coloured_ball_tracker_properties.set_value_of(message.path, message.value);
-                this.properties_ui.update();
-
-            }
-
-            onPropChanged(prop_node) {
-                const path = prop_node.path_as_string();
-                switch (path) {
-                    case "frame/quality":
-                        this.send_tasks_per_frame("frame", "frame_task", "update", {'quality': prop_node.value()}); //update the frames task...
-                        break;
-                    case "histogram/samples":
-                        //console.log(prop_node.value());
-                        this.hsv_hist.hue.running_samples = prop_node.value();
-                        this.hsv_hist.saturation.running_samples = prop_node.value();
-                        this.hsv_hist.luminosity.running_samples = prop_node.value();
-                        break;
-                    default:
-                        this.send_property_update(path, prop_node.value())
-                }
-            }
-
-            on_message_tasks_per_frame(message) {
-                const tasks = message.tasks;
-                tasks.forEach(task => {
-                    switch (task.task) {
-                        case "frame":
-                            this.task_frame(task.result);
-                            break;
-                        case "balls":
-                            this.task_balls(task.result);
-                            break;
-                        case "sample":
-                            this.task_sample(task.result);
-                            break;
-                        case "track":
-                            this.task_track(task.result);
-                            break;
-                    }
-                });
-
-
+                this.canvas.update_resolution(width, height);
             }
 
             imageUpdated() {
-                // we cannot draw immediatley if frame is not loaded...
-                this.canvas2d.clear();
                 if (this.frame !== null) {
                     this.canvas2d.image(this.frame);
                 }
-                this.balls.forEach(ball => {
-                    this.canvas2d.circle(ball.x, ball.y, ball.radius, ball.colour)
-                });
-
-                this.histogramCanvas.clear();
-                this.histogram2Canvas.clear();
-
-                const p = this.properties[0];
-
-                const blur_size = p.value_of('histogram/blur');
-                const blur_times = p.value_of('histogram/blur_times');
-                const maxima_threshold = p.value_of('histogram/maxima_threshold');
-
-
-                if (this.lastHSVHistogram !== null) {
-                    const colors = ["hue", "saturation", "luminosity"];
-                    // console.log(message.pixel_count);
-                    colors.forEach((color, index) => {
-                        let hist = this.lastHSVHistogram.histogram_hsv[index];
-                        hist = blur(hist, blur_size, (index === 0), blur_times);
-                        const max = this.max_of_histogram(hist);
-                        this.draw_histogram_hsv(hist, colors[index], max, this.histogramCanvas);
-
-                    });
-                    this.histogramCanvas.text(20, 20, this.lastHSVHistogram.pixel_count + "");
-
-                    this.lastColourResult = {};
-                    //avergae
-                    colors.forEach((color, index) => {
-                        let avg = this.hsv_hist[color].average();
-                        avg = this.remove_low_signal(avg);
-                        const avg_blur = blur(avg, blur_size, (index === 0), blur_times);
-                        let max = this.max_of_histogram(avg_blur);
-                        this.lastColourResult[color] = this.draw_histogram_hsv(avg_blur, color, Math.round(max), this.histogram2Canvas);
-
-                    });
-                }
-                if (this.lastHistogram !== null) {
+                /*if (this.lastHistogram !== null) {
                     const colors = [[0, 0, 255], [0, 255, 0], [255, 0, 0]];
                     colors.forEach((color, index) => {
                         const hist = this.lastHistogram.histogram[index];
-                        const max = hist.reduce((max, cur) => Math.max(max, cur), 0);
-                        this.draw_histogram(hist, colors[index], max, /*this.lastHistogram.pixel_count*/);
+                        const max = max_of_histogram(hist);//hist.reduce((max, cur) => Math.max(max, cur), 0);
+                        this.draw_histogram(hist, colors[index], max,);
                     });
-                }
+                }*/
             }
 
-            max_of_histogram(hist) {
-                return hist.reduce((max, cur) => Math.max(max, cur), 0);
-            }
-
-            number_of_samples_in_histogram(hist, sample_size = 1) {
-                const total = hist.reduce((value, acc) => value + acc, 0);
-                return Math.round(total / sample_size);
-            }
-
-            remove_low_signal(hist, signal = 0.001) {
-                const nos = this.number_of_samples_in_histogram(hist);
-                const threshold = nos * signal;
-                return hist.map(x => {
-                    if (x < threshold) {
-                        return 0;
-                    } else {
-                        return x;
-                    }
-                })
-            }
-
-            draw_histogram_hsv_all(histograms, canvas2d) {
-                const p = this.properties[0];
-                const blur_size = p.value_of('histogram/blur');
-                const blur_times = p.value_of('histogram/blur_times');
-                const colors = ["hue", "saturation", "luminosity"];
-                // console.log(message.pixel_count);
-                colors.forEach((color, index) => {
-                    let hist = histograms[index];
-                    hist = blur(hist, blur_size, (index === 0), blur_times);
-                    const max = this.max_of_histogram(hist);
-                    this.draw_histogram_hsv(hist, colors[index], max, canvas2d);
-
-                });
-            }
-
-            normalize_histogram(hist) {
-                const max = hist.reduce((max, cur) => Math.max(max, cur), 0);
-                if (max === 0) {
-                    return filled_array(hist.length, 0);
-                }
-                return hist.map(x => x / max);
-            }
-
-            normalize(value, max) {
-                if (max === 0) {
-                    return 0;
-                }
-                return value / max;
-            }
-
-
-            task_balls(message) {
+            on_task_balls(message) {
                 this.update_canvas_size(message.resolution[0], message.resolution[1]);
                 //wrap balls up in simple object
                 this.balls = message.balls.map(b => {
@@ -632,13 +256,23 @@
                         colour: b[1],
                         radius: parseFloat(b[2]),
                         x: parseInt(b[3]),
-                        y: parseInt(b[4])
+                        y: parseInt(b[4]),
+                        x_from: parseInt(b[5]),
+                        y_from: parseInt(b[6]),
                     };
                 });
+                //draw the balls...
+                this.canvas.clear();
+                this.balls.forEach(ball => {
+                    this.canvas.circle(ball.x, ball.y, ball.radius, ball.colour);
+                    this.canvas.text(ball.x, ball.y, ''+ball.id);
+                    this.canvas.line(ball.x, ball.y, ball.x_from, ball.y_from, ball.colour );
+                });
+
 
             }
 
-            task_sample(message) {
+            on_task_sample(message) {
                 if (message.event === 'colour') {
                     console.log(message.hsv)
                 }
@@ -646,22 +280,56 @@
                     this.lastHistogram = message;
                 }
                 else if (message.event === 'histogram_hsv') {
-                    this.lastHSVHistogram = message;
-                    this.hsv_hist.hue.addSample(message.histogram_hsv[0]);
-                    this.hsv_hist.saturation.addSample(message.histogram_hsv[1]);
-                    this.hsv_hist.luminosity.addSample(message.histogram_hsv[2]);
+                    let hsv_histogram = message;
+
+                    const colors = ["hue", "saturation", "luminosity"];
+
+                    colors.forEach((color, index) => {
+                        this.hsv_histogram_averaged[color].addSample(message.histogram_hsv[index]);
+                    });
+
+
+
+                    const p = this.properties;
+
+                    const blur_size = p.value_of('histogram/blur');
+                    const blur_times = p.value_of('histogram/blur_times');
+
+                    this.histogramCanvas.clear();
+                    // console.log(message.pixel_count);
+                    colors.forEach((color, index) => {
+                        let hist = hsv_histogram.histogram_hsv[index];
+                        hist = blur(hist, blur_size, (index === 0), blur_times);
+                        const max = max_of_histogram(hist);
+                        this.draw_histogram_hsv(hist, colors[index], max, this.histogramCanvas);
+
+                    });
+                    this.histogramCanvas.text(20, 20, hsv_histogram.pixel_count + "");
+
+                    this.lastColourResult = {};
+                    //now show the averraged one:
+
+                    this.histogram2Canvas.clear();
+                    colors.forEach((color, index) => {
+                        let avg = this.hsv_histogram_averaged[color].average();
+                        avg = remove_low_signal(avg);
+                        const avg_blur = blur(avg, blur_size, (index === 0), blur_times);
+                        let max = max_of_histogram(avg_blur);
+                        this.lastColourResult[color] = this.draw_histogram_hsv(avg_blur, color, Math.round(max), this.histogram2Canvas);
+
+                    });
+
 
                 }
             }
 
-            task_track(message) {
-                //let hist = message.histogram_hsv;
-                //console.log(message.ball);
+            on_task_track(message) {
                 this.histogramTrackCanvas.clear();
                 this.draw_histogram_hsv_all(message.histogram_hsv, this.histogramTrackCanvas);
             }
 
-            task_frame(message) {
+            on_task_frame(message) {
+                //we received an image
                 let src = false;
                 if (message.image.format === "jpg") {
                     src = 'data:image/jpg;base64,' + message.image.data;
@@ -671,51 +339,37 @@
                 }
                 if (src !== false) {
                     this.frame = new Image();
+                    this.update_canvas_size(message.image.resolution[0], message.image.resolution[1]);
+                    //we cannot immediately used it - this is async.
                     this.frame.addEventListener("load", () => this.imageUpdated(), false);
                     this.frame.src = src;
                 }
             }
 
+            draw_histogram_hsv_all(histograms, canvas2d) {
+                const p = this.properties;
+                const blur_size = p.value_of('histogram/blur');
+                const blur_times = p.value_of('histogram/blur_times');
+                const colors = ["hue", "saturation", "luminosity"];
+                // console.log(message.pixel_count);
+                colors.forEach((color, index) => {
+                    let hist = histograms[index];
+                    hist = blur(hist, blur_size, (index === 0), blur_times);
+                    const max = max_of_histogram(hist);
+                    this.draw_histogram_hsv(hist, colors[index], max, canvas2d);
 
-            //https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-            on_message(message_event) {
-                const message_raw = message_event.data;
-                let message = null;
-                try {
-                    message = JSON.parse(message_raw);
-                }
-                catch (ex) {
-                    console.log(ex);
-                    console.log(message_raw);
-                    return;
-                }
-                if ("type" in message) {
-                    const method_name = "on_message_" + message.type;
-                    if (method_name in this) {
-                        this[method_name].apply(this, [message])
-                    }
-
-                } else {
-                    console.log('unknown message :' + message_raw);
-                }
+                });
             }
 
-            draw_histogram(histogram, colour, pixel_count) {
-                for (let index = 0; index < histogram.length - 1; index++) {
-                    this.histogramCanvas.line(
-                        index, this.hist_map((histogram[index] / pixel_count)),
-                        index + 1, this.hist_map(histogram[index + 1] / pixel_count),
-                        colour
-                    )
 
-                }
-            }
+
+
 
 
             draw_histogram_hsv(histogram, colour, max_value, canvas2d) {
-                const maxima_range = this.properties[0].value_of('histogram/maxima_range');
-                const maxima_threshold = this.properties[0].value_of('histogram/maxima_threshold');
-                const signal_minimum = this.properties[0].value_of('histogram/signal_minimum');
+                const maxima_range = this.properties.value_of('histogram/maxima_range');
+                const maxima_threshold = this.properties.value_of('histogram/maxima_threshold');
+                const signal_minimum = this.properties.value_of('histogram/signal_minimum');
                 let spec = 0;
                 if (colour === "hue") { //HUE
                 } else if (colour === "saturation") {
@@ -731,7 +385,10 @@
 
                 let result = null;
 
-                for (let index = 0; index < histogram.length - 1; index++) {
+                //draw the line of the histogram...
+                draw_histogram_line(canvas2d, 0, y_offset, h3, histogram, max_value,  colour);
+
+               /* for (let index = 0; index < histogram.length - 1; index++) {
                     let col = [200, 200, 200];
 
                     if (colour === "hue") { //HUE
@@ -748,7 +405,7 @@
                         (index + 1) * 2, y_offset - (Math.round((histogram[index + 1] / max_value) * h3)),
                         col
                     )
-                }
+                }*/
 
 
                 //const extrema2 = findLocalMaxima(histogram, 10);
@@ -766,7 +423,7 @@
                     });
                     let valid_maxima = maxima.filter(index => {
                         let value = histogram[index];
-                        let normalized_value = this.normalize(value, max_value);
+                        let normalized_value = normalize(value, max_value);
                         return (normalized_value > maxima_threshold);
                     });
 
@@ -784,7 +441,7 @@
                         //seek left from lowest maxima
                         let index = valid_maxima[0];
                         while (index >= 0) {
-                            let norm_value = this.normalize(histogram[index], max_value);
+                            let norm_value = normalize(histogram[index], max_value);
                             if (norm_value < signal_minimum) {
                                 break;
                             }
@@ -795,7 +452,7 @@
                         //seek rigth from highest maxima
                         index = valid_maxima[valid_maxima.length - 1];
                         while (index < histogram.length) {
-                            let norm_value = this.normalize(histogram[index], max_value);
+                            let norm_value = normalize(histogram[index], max_value);
                             if (norm_value < signal_minimum) {
                                 break;
                             }
@@ -868,19 +525,22 @@
 
 
             }
-
+/*
             hist_map(value) {
                 const h = this.histogramCanvas.height();
                 return h - Math.round(value * h);
             }
 
+            draw_histogram(histogram, colour, pixel_count) {
+                for (let index = 0; index < histogram.length - 1; index++) {
+                    this.histogramCanvas.line(
+                        index, this.hist_map((histogram[index] / pixel_count)),
+                        index + 1, this.hist_map(histogram[index + 1] / pixel_count),
+                        colour
+                    )
+                }
+            }*/
 
-            // draw_balls() {
-            //     this.canvas2d.image(this.img);
-            //     this.balls.forEach(ball => {
-            //         this.canvas2d.circle(ball.x, ball.y, ball.radius, ball.colour)
-            //     });
-            // }
 
             toggle_ui() {
                 this.show_ui = !this.show_ui;
@@ -896,15 +556,6 @@
                 this.send_message("stabilize", {"frames": 30});
             }
 
-            send_property_update(path, value) {
-                this.send_message('prop', {'path': path, 'value': value});
-            }
-
-            send_message(type, message = {}) {
-                message.type = type;
-                //  console.log('sending ' + message.type);
-                this.send_json(message);
-            }
 
             id_extra(extra) {
                 return (this.id + extra)
@@ -919,8 +570,8 @@
                 if (value === null) {
                     return;
                 }
-                this.send_tasks_per_frame('track','track_hsv','stop');
-                this.send_tasks_per_frame('track','track_hsv','start',{colour:value});
+                this.send_tasks_per_frame('track', 'track_hsv', 'stop');
+                this.send_tasks_per_frame('track', 'track_hsv', 'start', {colour: value});
 
             }
 
@@ -950,11 +601,9 @@
                     if (min_huer < 0) {
                         min_huer = 0;
                     }
-
-
-                    this.coloured_ball_tracker_properties.set_value_of(colorpath + "min_hsv",
+                    this.properties.set_value_of(colorpath + "min_hsv",
                         [min_huer, this.lastColourResult['saturation']['left'], this.lastColourResult['luminosity']['left']], true);
-                    this.coloured_ball_tracker_properties.set_value_of(colorpath + "max_hsv",
+                    this.properties.set_value_of(colorpath + "max_hsv",
                         [this.lastColourResult['hue']['right'], this.lastColourResult['saturation']['right'], this.lastColourResult['luminosity']['right']], true);
                     this.properties_ui.update();
                     this.properties_ui.trigger_notification(colorpath + "min_hsv");
@@ -973,11 +622,11 @@
                 this.element.id = this.id_extra('');
                 const html = '<div>' +
                     '<canvas ' + this.id_as_html('canvas') + '></canvas>' +
-
+                    '<canvas ' + this.id_as_html('canvas_balls') + '></canvas>' +
                     '</div>' +
                     '<div>' +
                     '<button ' + this.id_as_html('toggle_ui') + '>Toggle UI</button>' +
-                    '<input type="text" value="127.0.0.1"' + this.id_as_html('ip') + '>' +
+                    '<input type="text" value="192.168.20.1"' + this.id_as_html('ip') + '>' +
                     '<button ' + this.id_as_html('connect') + '>Connect</button>' +
                     '<button ' + this.id_as_html('stabilize') + '>Stabilize</button>' +
                     '<input type="radio" name="' + this.id_extra('colors') + '" value="blue" >Blue</input>' +

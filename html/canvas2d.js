@@ -91,6 +91,13 @@ class Canvas2D {
         this.ctx.fill();
     }
     
+    rect(x1, y1, x2, y2, colour=[255,255,255]) {
+        if (!this.ready()) return; //todo implement as empty functions?
+        this.ctx.strokeStyle = 'rgb('+colour.join(',')+')';
+        this.ctx.rect(x1, y1, x2-x1, y2-y1);
+        this.ctx.stroke();
+    }
+    
     text(x, y, text, colour=[255,255,255], size=12, font="Arial") {
         if (!this.ready()) return; //todo implement as empty functions?
         this.ctx.font = size+"px "+font;
@@ -120,7 +127,7 @@ class Canvas2D {
         if (!this.ready()) return; //todo implement as empty functions?
         this.ctx.beginPath();
        // console.log(colour);
-        this.ctx.strokeStyle = 'rgb('+colour.join(',')+')';
+        this.ctx.strokeStyle = colour;// 'rgb('+colour.join(',')+')';
         this.ctx.moveTo(x,y);
         this.ctx.lineTo(x_to,y_to);
         this.ctx.stroke();
